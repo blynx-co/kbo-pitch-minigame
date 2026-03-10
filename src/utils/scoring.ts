@@ -3,20 +3,21 @@ import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 
 // Score per pitch outcome (0-100)
+// Design: 5-at-bat game, "3 outs + 1K + 1 hit" → B grade
 export function scorePitch(outcome: PitchOutcome, zone: Zone): number {
   const isChaseZone = [11, 12, 13, 14].includes(zone);
 
   switch (outcome) {
     case 'called_strike': return 80;
     case 'swinging_strike': return 100;
-    case 'foul': return 40;
-    case 'ball': return isChaseZone ? 20 : 5; // intended chase vs missed location
-    case 'groundout': return 70;
-    case 'flyout': return 70;
-    case 'lineout': return 75;
-    case 'single': return 10;
-    case 'double': return 5;
-    case 'triple': return 3;
+    case 'foul': return 50;            // 파울 유도도 전략 (40→50)
+    case 'ball': return isChaseZone ? 35 : 10; // 유인구 볼넷 전략 인정 (20→35, 5→10)
+    case 'groundout': return 80;       // 범타 아웃 = 좋은 결과 (70→80)
+    case 'flyout': return 80;
+    case 'lineout': return 85;
+    case 'single': return 15;          // 안타 허용해도 싸운 건 인정 (10→15)
+    case 'double': return 10;
+    case 'triple': return 5;
     case 'homerun': return 0;
   }
 }
@@ -25,14 +26,14 @@ export function scorePitch(outcome: PitchOutcome, zone: Zone): number {
 export function scoreAtBat(outcome: AtBatOutcome): number {
   switch (outcome.type) {
     case 'strikeout': return 300;
-    case 'out': return 200;
-    case 'walk': return 50;
+    case 'out': return 250;           // 아웃 처리 보너스 상향 (200→250)
+    case 'walk': return 80;           // 볼넷도 홈런보다는 낫다 (50→80)
     case 'hit':
       switch (outcome.result) {
-        case 'single': return 0;
-        case 'double': return 0;
-        case 'triple': return 0;
-        case 'homerun': return 0;
+        case 'single': return 30;     // 싸우다 허용한 안타 (0→30)
+        case 'double': return 15;     // 장타는 적게 (0→15)
+        case 'triple': return 5;
+        case 'homerun': return 0;     // 홈런은 0 유지
       }
   }
 }
@@ -53,20 +54,26 @@ export function calculateTotalScore(atBats: AtBatSummary[]): number {
   }, 0);
 }
 
-// Max possible score: 5 at-bats, avg 5 pitches each, all swinging strikes + strikeouts
-// 5 * (5 * 100 + 300) = 4000, but theoretical max is higher
-export const MAX_SCORE = 5000;
-export const JAPAN_MAX_SCORE = 5000;
-// DOM mode: 9 at-bats, theoretical max higher
-export const DOM_MAX_SCORE = 9000;
+// Realistic max scores based on simulation:
+// Japan: 5 at-bats, best realistic = ~2700 (3K + 2 outs)
+// DOM: 9 at-bats, proportional = 9/5 * 3000 = 5400
+export const MAX_SCORE = 3000;
+export const JAPAN_MAX_SCORE = 3000;
+export const DOM_MAX_SCORE = 5400;
 
+// Grade thresholds (designed so typical good play = B):
+// All outs (~2700/3000=90%) → S
+// 4 outs + 1 hit (~2300/3000=77%) → A
+// 3 outs + 2 hits (~1900/3000=63%) → B
+// 2 outs + 3 hits (~1500/3000=50%) → C
+// 1 out + 4 hits (~1250/3000=42%) → D
 export function getGrade(score: number, maxScore: number = MAX_SCORE): { grade: string; label: string } {
   const pct = score / maxScore;
-  if (pct >= 0.90) return { grade: 'S', label: '명포수' };
-  if (pct >= 0.75) return { grade: 'A', label: '시리즈 MVP급' };
-  if (pct >= 0.60) return { grade: 'B', label: '1군 주전 자격 있음' };
-  if (pct >= 0.45) return { grade: 'C', label: '2군 복귀각' };
-  if (pct >= 0.30) return { grade: 'D', label: '감독 눈치 보는 중' };
+  if (pct >= 0.80) return { grade: 'S', label: '명포수' };
+  if (pct >= 0.65) return { grade: 'A', label: '시리즈 MVP급' };
+  if (pct >= 0.50) return { grade: 'B', label: '1군 주전 자격 있음' };
+  if (pct >= 0.35) return { grade: 'C', label: '2군 복귀각' };
+  if (pct >= 0.20) return { grade: 'D', label: '감독 눈치 보는 중' };
   return { grade: 'F', label: '벤치 직행' };
 }
 
