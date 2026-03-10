@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import type { AtBatOutcome, PitchOutcome } from '../data/types';
 import type { AtBatSummary } from '../utils/scoring';
-import { getGrade, generateShareText, copyShareText, MAX_SCORE } from '../utils/scoring';
+import { getGrade, generateShareText, copyShareText, JAPAN_MAX_SCORE, DOM_MAX_SCORE } from '../utils/scoring';
 import { BATTER_PROFILES } from '../data/batterProfiles';
+import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 
 interface GameResultProps {
   atBats: AtBatSummary[];
   totalScore: number;
   onRestart: () => void;
+  gameMode?: 'japan' | 'dom';
+  pitcherName?: string;
 }
 
 function pitchEmoji(outcome: PitchOutcome): string {
@@ -55,13 +58,15 @@ function gradeColor(grade: string): string {
   }
 }
 
-export default function GameResult({ atBats, totalScore, onRestart }: GameResultProps) {
+export default function GameResult({ atBats, totalScore, onRestart, gameMode, pitcherName }: GameResultProps) {
   const [copied, setCopied] = useState(false);
-  const { grade, label } = getGrade(totalScore);
-  const pct = Math.round((totalScore / MAX_SCORE) * 100);
+  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES };
+  const maxScore = gameMode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
+  const { grade, label } = getGrade(totalScore, maxScore);
+  const pct = Math.round((totalScore / maxScore) * 100);
 
   const handleCopy = async () => {
-    const text = generateShareText(atBats, totalScore);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName);
     const ok = await copyShareText(text);
     if (ok) {
       setCopied(true);
@@ -70,13 +75,13 @@ export default function GameResult({ atBats, totalScore, onRestart }: GameResult
   };
 
   const handleShareX = () => {
-    const text = generateShareText(atBats, totalScore);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName);
     const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
   const handleShareThreads = () => {
-    const text = generateShareText(atBats, totalScore);
+    const text = generateShareText(atBats, totalScore, gameMode, pitcherName);
     const url = `https://www.threads.net/intent/post?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
@@ -85,7 +90,9 @@ export default function GameResult({ atBats, totalScore, onRestart }: GameResult
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
         {/* Title */}
-        <h2 className="text-center text-lg text-slate-400 mb-1">오늘의 포수 성적표</h2>
+        <h2 className="text-center text-lg text-slate-400 mb-1">
+          {gameMode === 'dom' ? '도미니카 챌린지 결과' : '오늘의 포수 성적표'}
+        </h2>
 
         {/* Grade */}
         <div className="text-center mb-6">
@@ -96,7 +103,7 @@ export default function GameResult({ atBats, totalScore, onRestart }: GameResult
         {/* Score */}
         <div className="text-center mb-6">
           <p className="text-amber-400 font-black text-3xl">
-            {totalScore.toLocaleString()} <span className="text-lg text-slate-400">/ {MAX_SCORE.toLocaleString()}</span>
+            {totalScore.toLocaleString()} <span className="text-lg text-slate-400">/ {maxScore.toLocaleString()}</span>
           </p>
           {/* Progress bar */}
           <div className="w-full bg-slate-700 rounded-full h-2.5 mt-2 max-w-xs mx-auto">
@@ -111,7 +118,7 @@ export default function GameResult({ atBats, totalScore, onRestart }: GameResult
         {/* At-bat summaries */}
         <div className="space-y-2 mb-6">
           {atBats.map((ab, i) => {
-            const batter = BATTER_PROFILES[ab.batterId];
+            const batter = allProfiles[ab.batterId];
             return (
               <div
                 key={i}

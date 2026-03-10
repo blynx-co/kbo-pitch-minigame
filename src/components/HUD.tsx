@@ -1,7 +1,7 @@
-import type { GameScenario } from '../data/types';
+import type { GameScenario, GameMode } from '../data/types';
 
 interface HUDProps {
-  scenario: GameScenario;
+  scenario?: GameScenario;
   balls: number;
   strikes: number;
   outs: number;
@@ -9,6 +9,7 @@ interface HUDProps {
   totalAtBats: number;
   pitcherName: string;
   batterName?: string;
+  gameMode?: GameMode;
 }
 
 function CountDots({
@@ -46,27 +47,44 @@ export default function HUD({
   totalAtBats,
   pitcherName,
   batterName,
+  gameMode,
 }: HUDProps) {
+  const isDom = gameMode === 'dom';
+
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-slate-900/90 backdrop-blur-sm border-b border-slate-700/50 px-4 py-2">
       <div className="max-w-lg mx-auto flex items-center justify-between text-sm">
-        {/* Score */}
-        <div className="flex items-center gap-1">
-          <span className="text-blue-400 font-bold">한 {scenario.scoreKor}</span>
-          <span className="text-slate-500">-</span>
-          <span className="text-red-400 font-bold">{scenario.scoreJpn} 일</span>
-        </div>
+        {/* Score / flags */}
+        {isDom ? (
+          <div className="flex items-center gap-1">
+            <span className="text-blue-400 font-bold">🇰🇷</span>
+            <span className="text-slate-500">vs</span>
+            <span className="text-red-400 font-bold">🇩🇴</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1">
+            <span className="text-blue-400 font-bold">한 {scenario?.scoreKor}</span>
+            <span className="text-slate-500">-</span>
+            <span className="text-red-400 font-bold">{scenario?.scoreJpn} 일</span>
+          </div>
+        )}
 
-        {/* Inning */}
-        <div className="text-slate-300 text-xs">
-          {scenario.inning}회{scenario.halfInning === 'top' ? '초' : '말'}
-        </div>
+        {/* Inning / at-bat order */}
+        {isDom ? (
+          <div className="text-slate-300 text-xs">
+            타순 {currentAtBat}/{totalAtBats}
+          </div>
+        ) : (
+          <div className="text-slate-300 text-xs">
+            {scenario?.inning}회{scenario?.halfInning === 'top' ? '초' : '말'}
+          </div>
+        )}
 
         {/* Count */}
         <div className="flex flex-col gap-0.5">
           <CountDots label="B" count={balls} max={4} activeColor="bg-green-500" />
           <CountDots label="S" count={strikes} max={3} activeColor="bg-yellow-500" />
-          <CountDots label="O" count={outs} max={3} activeColor="bg-red-500" />
+          {!isDom && <CountDots label="O" count={outs} max={3} activeColor="bg-red-500" />}
         </div>
 
         {/* Pitcher/Batter + progress */}
@@ -75,7 +93,9 @@ export default function HUD({
             <p className="text-amber-400 text-xs font-bold">vs {batterName}</p>
           )}
           <p className="text-white text-xs font-medium">{pitcherName}</p>
-          <p className="text-slate-400 text-[10px]">{currentAtBat} / {totalAtBats} 타석</p>
+          {!isDom && (
+            <p className="text-slate-400 text-[10px]">{currentAtBat} / {totalAtBats} 타석</p>
+          )}
         </div>
       </div>
     </div>

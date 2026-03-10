@@ -1,5 +1,6 @@
 import type { PitchOutcome, PitchRecord, AtBatOutcome, Zone } from '../data/types';
 import { BATTER_PROFILES } from '../data/batterProfiles';
+import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 
 // Score per pitch outcome (0-100)
 export function scorePitch(outcome: PitchOutcome, zone: Zone): number {
@@ -55,9 +56,12 @@ export function calculateTotalScore(atBats: AtBatSummary[]): number {
 // Max possible score: 5 at-bats, avg 5 pitches each, all swinging strikes + strikeouts
 // 5 * (5 * 100 + 300) = 4000, but theoretical max is higher
 export const MAX_SCORE = 5000;
+export const JAPAN_MAX_SCORE = 5000;
+// DOM mode: 9 at-bats, theoretical max higher
+export const DOM_MAX_SCORE = 9000;
 
-export function getGrade(score: number): { grade: string; label: string } {
-  const pct = score / MAX_SCORE;
+export function getGrade(score: number, maxScore: number = MAX_SCORE): { grade: string; label: string } {
+  const pct = score / maxScore;
   if (pct >= 0.90) return { grade: 'S', label: '명포수' };
   if (pct >= 0.75) return { grade: 'A', label: '시리즈 MVP급' };
   if (pct >= 0.60) return { grade: 'B', label: '1군 주전 자격 있음' };
@@ -103,19 +107,29 @@ function atBatResultText(outcome: AtBatOutcome): string {
 }
 
 // Generate share text
-export function generateShareText(atBats: AtBatSummary[], totalScore: number): string {
-  const { grade, label } = getGrade(totalScore);
+export function generateShareText(
+  atBats: AtBatSummary[],
+  totalScore: number,
+  mode: 'japan' | 'dom' = 'japan',
+  pitcherName?: string,
+): string {
+  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES };
+  const maxScore = mode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
+  const { grade, label } = getGrade(totalScore, maxScore);
+
+  const header = mode === 'japan'
+    ? ['\u26BE 답답하면 니가 던지던가', '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 일본 \uD83C\uDDEF\uD83C\uDDF5 WBC 2026']
+    : ['\u26BE 도전! 도미니카!', '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 도미니카 \uD83C\uDDE9\uD83C\uDDF4 WBC 2026', pitcherName ? `투수: ${pitcherName}` : ''];
 
   const lines = atBats.map((ab) => {
-    const batter = BATTER_PROFILES[ab.batterId];
+    const batter = allProfiles[ab.batterId];
     const emojis = ab.pitchHistory.map(p => pitchEmoji(p.outcome)).join('');
     const result = atBatResultText(ab.outcome);
     return `${batter?.nameKo || ab.batterId}: ${emojis}  ${result}`;
   });
 
   return [
-    '\u26BE 답답하면 니가 던지던가',
-    '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 일본 \uD83C\uDDEF\uD83C\uDDF5 WBC 2026',
+    ...header.filter(Boolean),
     '',
     ...lines,
     '',

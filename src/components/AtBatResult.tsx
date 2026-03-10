@@ -121,11 +121,13 @@ export default function AtBatResult({
           </p>
         </div>
 
-        {/* Actual result comparison */}
-        <div className="bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 mb-6">
-          <p className="text-xs text-slate-400 mb-1">실제 결과</p>
-          <p className="text-slate-200 text-sm font-medium">{scenarioActualResult}</p>
-        </div>
+        {/* Actual result comparison (Japan mode only) */}
+        {scenarioActualResult && (
+          <div className="bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 mb-6">
+            <p className="text-xs text-slate-400 mb-1">실제 결과</p>
+            <p className="text-slate-200 text-sm font-medium">{scenarioActualResult}</p>
+          </div>
+        )}
 
         {/* Next button */}
         <button

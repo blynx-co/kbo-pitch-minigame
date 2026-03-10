@@ -20,7 +20,7 @@ export interface BatterProfile {
   id: string;
   name: string;
   nameKo: string;
-  bats: 'L' | 'R';
+  bats: 'L' | 'R' | 'S';
   team: string;
   zones: Record<Zone, ZoneStats>;
   pitchTypeStats: Record<string, PitchTypeStats>;
@@ -91,14 +91,40 @@ export interface PitchTrajectory {
   batSide: 'L' | 'R';
 }
 
-// Game state
+// Game mode
+export type GameMode = 'japan' | 'dom';
+
+// DOM-specific game phase adds mode_select, pitcher_select, lineup_select
 export type GamePhase =
+  | 'mode_select'
   | 'intro'
+  | 'pitcher_select'
+  | 'lineup_select'
   | 'pitch_select'
   | 'animating'
   | 'outcome'
   | 'at_bat_result'
   | 'game_result';
+
+// Korean pitcher profile for DOM mode
+export interface KorPitcherProfile {
+  id: string;
+  name: string;
+  nameKo: string;
+  hand: 'L' | 'R';
+  style: string;
+  description: string;
+  pitches: PitchOption[];
+}
+
+// DOM lineup configuration
+export interface DomLineup {
+  id: string;
+  name: string;
+  nameKo: string;
+  description: string;
+  batterIds: string[]; // 9 batter IDs in order
+}
 
 export interface AtBatState {
   scenarioIndex: number;

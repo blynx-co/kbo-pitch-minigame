@@ -1,5 +1,6 @@
 import type { Zone, PitchOutcome, PitchTrajectory } from '../data/types';
 import { BATTER_PROFILES } from '../data/batterProfiles';
+import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 
 // Strike zone: zones 1-9 are IN the zone, 11-14 are OUTSIDE
 const STRIKE_ZONES: Zone[] = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -43,7 +44,7 @@ export function determinePitchOutcome(
   balls: number,
   strikes: number,
 ): PitchOutcome {
-  const batter = BATTER_PROFILES[batterId];
+  const batter = BATTER_PROFILES[batterId] || DOM_BATTER_PROFILES[batterId];
   if (!batter) throw new Error(`Unknown batter: ${batterId}`);
 
   const zoneStats = batter.zones[zone];

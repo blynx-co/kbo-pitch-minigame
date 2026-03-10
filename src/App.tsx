@@ -1,15 +1,23 @@
 import { useState, useCallback } from 'react';
 import type {
   GamePhase,
+  GameMode,
   AtBatState,
   Zone,
   PitchOutcome,
   PitchTrajectory,
   AtBatOutcome,
+  KorPitcherProfile,
+  DomLineup,
+  BatterProfile,
+  PitchOption,
 } from './data/types';
 import { SCENARIOS } from './data/scenarios';
 import { BATTER_PROFILES } from './data/batterProfiles';
 import { PITCHER_REPERTOIRE } from './data/pitcherRepertoire';
+import { DOM_BATTER_PROFILES } from './data/domBatterProfiles';
+import { DOM_LINEUPS } from './data/domLineups';
+import { KOR_PITCHERS } from './data/korPitcherProfiles';
 import { determinePitchOutcome, generatePitchTrajectory } from './engine/outcomeEngine';
 import { scorePitch, scoreAtBat, calculateTotalScore } from './utils/scoring';
 import type { AtBatSummary } from './utils/scoring';
@@ -20,8 +28,11 @@ import OutcomeDisplay from './components/OutcomeDisplay';
 import AtBatResult from './components/AtBatResult';
 import GameResult from './components/GameResult';
 import HUD from './components/HUD';
+import ModeSelect from './components/ModeSelect';
+import PitcherSelect from './components/PitcherSelect';
+import LineupSelect from './components/LineupSelect';
 
-const TOTAL_AT_BATS = SCENARIOS.length;
+const TOTAL_AT_BATS_JAPAN = SCENARIOS.length;
 
 function isAtBatOver(
   outcome: PitchOutcome,
@@ -78,7 +89,10 @@ function updateCount(
 }
 
 export default function App() {
-  const [phase, setPhase] = useState<GamePhase>('intro');
+  const [phase, setPhase] = useState<GamePhase>('mode_select');
+  const [gameMode, setGameMode] = useState<GameMode>('japan');
+  const [selectedPitcher, setSelectedPitcher] = useState<KorPitcherProfile | null>(null);
+  const [selectedLineup, setSelectedLineup] = useState<DomLineup | null>(null);
   const [atBat, setAtBat] = useState<AtBatState>({
     scenarioIndex: 0,
     balls: 0,
@@ -97,23 +111,71 @@ export default function App() {
   } | null>(null);
   const [atBatOver, setAtBatOver] = useState<{ result: AtBatOutcome; score: number } | null>(null);
 
-  // Current scenario data
-  const scenario = SCENARIOS[atBat.scenarioIndex];
-  const batter = scenario ? BATTER_PROFILES[scenario.batterId] : null;
-  const pitcher = scenario ? PITCHER_REPERTOIRE[scenario.pitcherId] : null;
+  // Derived data based on mode
+  const totalAtBats = gameMode === 'dom'
+    ? (selectedLineup?.batterIds.length ?? 9)
+    : TOTAL_AT_BATS_JAPAN;
+
+  // Current batter/pitcher based on mode
+  let batter: BatterProfile | null = null;
+  let pitcher: { pitches: PitchOption[]; hand: 'L' | 'R'; nameKo: string } | null = null;
+  let scenario = undefined as ReturnType<typeof Object.assign> | undefined;
+
+  if (gameMode === 'japan') {
+    const sc = SCENARIOS[atBat.scenarioIndex];
+    scenario = sc;
+    batter = sc ? BATTER_PROFILES[sc.batterId] : null;
+    const pitcherData = sc ? PITCHER_REPERTOIRE[sc.pitcherId] : null;
+    pitcher = pitcherData ? { pitches: pitcherData.pitches, hand: pitcherData.hand, nameKo: pitcherData.nameKo } : null;
+  } else if (gameMode === 'dom' && selectedLineup && selectedPitcher) {
+    const batterId = selectedLineup.batterIds[atBat.scenarioIndex];
+    batter = batterId ? DOM_BATTER_PROFILES[batterId] : null;
+    pitcher = { pitches: selectedPitcher.pitches, hand: selectedPitcher.hand, nameKo: selectedPitcher.nameKo };
+  }
 
   // Handlers
+  const handleSelectMode = useCallback((mode: GameMode) => {
+    setGameMode(mode);
+    if (mode === 'japan') {
+      setPhase('intro');
+    } else {
+      setPhase('pitcher_select');
+    }
+  }, []);
+
+  const handleSelectPitcher = useCallback((p: KorPitcherProfile) => {
+    setSelectedPitcher(p);
+    setPhase('lineup_select');
+  }, []);
+
+  const handleSelectLineup = useCallback((lineup: DomLineup) => {
+    setSelectedLineup(lineup);
+    setAtBat({ scenarioIndex: 0, balls: 0, strikes: 0, pitchHistory: [], result: null });
+    setPhase('pitch_select');
+  }, []);
+
+  const handleBackToModeSelect = useCallback(() => {
+    setPhase('mode_select');
+    setSelectedPitcher(null);
+    setSelectedLineup(null);
+  }, []);
+
+  const handleBackToPitcherSelect = useCallback(() => {
+    setPhase('pitcher_select');
+    setSelectedLineup(null);
+  }, []);
+
   const handleStart = useCallback(() => {
     setPhase('pitch_select');
   }, []);
 
   const handlePitchSelect = useCallback(
     (pitchCode: string, zone: Zone) => {
-      if (!scenario || !batter || !pitcher) return;
+      if (!batter || !pitcher) return;
 
-      // Determine outcome
+      // Determine outcome — works for both modes since outcomeEngine checks both profile maps
       const outcome = determinePitchOutcome(
-        scenario.batterId,
+        batter.id,
         pitchCode,
         zone,
         atBat.balls,
@@ -124,13 +186,14 @@ export default function App() {
       const pitchOption = pitcher.pitches.find((p) => p.code === pitchCode);
       const avgSpeed = pitchOption?.avgSpeed || 90;
 
-      // Generate trajectory
+      // Generate trajectory — switch hitters default to R side for animation
+      const batSide = batter.bats === 'S' ? 'R' : batter.bats;
       const trajectory = generatePitchTrajectory(
         pitchCode,
         zone,
         avgSpeed,
         pitcher.hand,
-        batter.bats,
+        batSide,
       );
 
       // Calculate new count
@@ -146,7 +209,7 @@ export default function App() {
       });
       setPhase('animating');
     },
-    [scenario, batter, pitcher, atBat.balls, atBat.strikes],
+    [batter, pitcher, atBat.balls, atBat.strikes],
   );
 
   const handleAnimationComplete = useCallback(() => {
@@ -154,7 +217,7 @@ export default function App() {
   }, []);
 
   const handleOutcomeNext = useCallback(() => {
-    if (!lastOutcome || !scenario) return;
+    if (!lastOutcome) return;
 
     const { outcome, pitchCode, zone, newBalls, newStrikes } = lastOutcome;
     const pitchScore = scorePitch(outcome, zone);
@@ -191,14 +254,19 @@ export default function App() {
       }));
       setPhase('pitch_select');
     }
-  }, [lastOutcome, atBat, scenario]);
+  }, [lastOutcome, atBat]);
 
   const handleAtBatNext = useCallback(() => {
-    if (!atBatOver || !scenario) return;
+    if (!atBatOver) return;
 
-    // Record completed at-bat (pitchHistory already includes the last pitch)
+    // batterId: for japan use scenario, for dom use lineup
+    const batterId = gameMode === 'japan'
+      ? (scenario?.batterId ?? '')
+      : (selectedLineup?.batterIds[atBat.scenarioIndex] ?? '');
+
+    // Record completed at-bat
     const summary: AtBatSummary = {
-      batterId: scenario.batterId,
+      batterId,
       pitchHistory: atBat.pitchHistory,
       outcome: atBatOver.result,
       totalScore: atBatOver.score,
@@ -209,7 +277,7 @@ export default function App() {
 
     const nextIndex = atBat.scenarioIndex + 1;
 
-    if (nextIndex >= TOTAL_AT_BATS) {
+    if (nextIndex >= totalAtBats) {
       // Game over
       setPhase('game_result');
     } else {
@@ -226,10 +294,13 @@ export default function App() {
       setCurrentTrajectory(null);
       setPhase('pitch_select');
     }
-  }, [atBatOver, scenario, atBat, completedAtBats]);
+  }, [atBatOver, scenario, atBat, completedAtBats, gameMode, selectedLineup, totalAtBats]);
 
   const handleRestart = useCallback(() => {
-    setPhase('intro');
+    setPhase('mode_select');
+    setGameMode('japan');
+    setSelectedPitcher(null);
+    setSelectedLineup(null);
     setAtBat({
       scenarioIndex: 0,
       balls: 0,
@@ -245,26 +316,49 @@ export default function App() {
 
   // Render based on phase
   switch (phase) {
+    case 'mode_select':
+      return <ModeSelect onSelectMode={handleSelectMode} />;
+
     case 'intro':
       return <GameIntro onStart={handleStart} />;
 
+    case 'pitcher_select':
+      return (
+        <PitcherSelect
+          pitchers={KOR_PITCHERS}
+          onSelect={handleSelectPitcher}
+          onBack={handleBackToModeSelect}
+        />
+      );
+
+    case 'lineup_select':
+      return (
+        <LineupSelect
+          lineups={DOM_LINEUPS}
+          batterProfiles={DOM_BATTER_PROFILES}
+          onSelect={handleSelectLineup}
+          onBack={handleBackToPitcherSelect}
+        />
+      );
+
     case 'pitch_select':
-      if (!scenario || !batter || !pitcher) return null;
+      if (!batter || !pitcher) return null;
       return (
         <>
           <HUD
             scenario={scenario}
             balls={atBat.balls}
             strikes={atBat.strikes}
-            outs={scenario.outs}
+            outs={scenario?.outs ?? 0}
             currentAtBat={atBat.scenarioIndex + 1}
-            totalAtBats={TOTAL_AT_BATS}
+            totalAtBats={totalAtBats}
             pitcherName={pitcher.nameKo}
             batterName={batter.nameKo}
+            gameMode={gameMode}
           />
           <PitchSelector
             pitches={pitcher.pitches}
-            batSide={batter.bats}
+            batSide={batter.bats === 'S' ? 'R' : batter.bats}
             onSelect={handlePitchSelect}
             balls={atBat.balls}
             strikes={atBat.strikes}
@@ -273,18 +367,19 @@ export default function App() {
       );
 
     case 'animating':
-      if (!scenario || !batter || !pitcher || !currentTrajectory) return null;
+      if (!batter || !pitcher || !currentTrajectory) return null;
       return (
         <>
           <HUD
             scenario={scenario}
             balls={atBat.balls}
             strikes={atBat.strikes}
-            outs={scenario.outs}
+            outs={scenario?.outs ?? 0}
             currentAtBat={atBat.scenarioIndex + 1}
-            totalAtBats={TOTAL_AT_BATS}
+            totalAtBats={totalAtBats}
             pitcherName={pitcher.nameKo}
             batterName={batter.nameKo}
+            gameMode={gameMode}
           />
           <PitchScene
             pitch={currentTrajectory}
@@ -295,18 +390,19 @@ export default function App() {
       );
 
     case 'outcome':
-      if (!scenario || !batter || !pitcher || !lastOutcome) return null;
+      if (!batter || !pitcher || !lastOutcome) return null;
       return (
         <>
           <HUD
             scenario={scenario}
             balls={lastOutcome.newBalls}
             strikes={lastOutcome.newStrikes}
-            outs={scenario.outs}
+            outs={scenario?.outs ?? 0}
             currentAtBat={atBat.scenarioIndex + 1}
-            totalAtBats={TOTAL_AT_BATS}
+            totalAtBats={totalAtBats}
             pitcherName={pitcher.nameKo}
             batterName={batter.nameKo}
+            gameMode={gameMode}
           />
           <OutcomeDisplay
             outcome={lastOutcome.outcome}
@@ -321,16 +417,16 @@ export default function App() {
       );
 
     case 'at_bat_result':
-      if (!scenario || !batter || !atBatOver) return null;
+      if (!batter || !atBatOver) return null;
       return (
         <AtBatResult
           batter={batter}
           outcome={atBatOver.result}
           pitchHistory={atBat.pitchHistory}
           totalScore={atBatOver.score}
-          scenarioActualResult={scenario.actualResult}
+          scenarioActualResult={scenario?.actualResult ?? ''}
           onNext={handleAtBatNext}
-          isLastAtBat={atBat.scenarioIndex + 1 >= TOTAL_AT_BATS}
+          isLastAtBat={atBat.scenarioIndex + 1 >= totalAtBats}
         />
       );
 
@@ -341,6 +437,8 @@ export default function App() {
           atBats={completedAtBats}
           totalScore={total}
           onRestart={handleRestart}
+          gameMode={gameMode}
+          pitcherName={selectedPitcher?.nameKo}
         />
       );
     }
