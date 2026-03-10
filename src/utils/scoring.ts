@@ -46,27 +46,30 @@ export interface AtBatSummary {
   totalScore: number;
 }
 
+// 삼진 = 만점: 과정과 무관하게 삼진으로 잡으면 타석당 최고점
+export const STRIKEOUT_PERFECT_SCORE = 600;
+
 export function calculateTotalScore(atBats: AtBatSummary[]): number {
   return atBats.reduce((sum, ab) => {
+    if (ab.outcome.type === 'strikeout') {
+      return sum + STRIKEOUT_PERFECT_SCORE;
+    }
     const pitchScore = ab.pitchHistory.reduce((s, p) => s + p.score, 0);
     const bonusScore = scoreAtBat(ab.outcome);
     return sum + pitchScore + bonusScore;
   }, 0);
 }
 
-// Realistic max scores based on simulation:
-// Japan: 5 at-bats, best realistic = ~2700 (3K + 2 outs)
-// DOM: 9 at-bats, proportional = 9/5 * 3000 = 5400
+// Max scores:
+// Japan: 5 at-bats × 600 = 3000
+// DOM: 6000 (9타석, 6K+3아웃=82%→S, 9아웃=67%→A)
 export const MAX_SCORE = 3000;
 export const JAPAN_MAX_SCORE = 3000;
-export const DOM_MAX_SCORE = 5400;
+export const DOM_MAX_SCORE = 6000;
 
-// Grade thresholds (designed so typical good play = B):
-// All outs (~2700/3000=90%) → S
-// 4 outs + 1 hit (~2300/3000=77%) → A
-// 3 outs + 2 hits (~1900/3000=63%) → B
-// 2 outs + 3 hits (~1500/3000=50%) → C
-// 1 out + 4 hits (~1250/3000=42%) → D
+// Grade thresholds:
+// DOM 기준: 9K=90%→S, 6K+3아웃=82%→S, 9아웃=67%→A
+// Japan 기준: 5K=100%→S, 3K+2아웃=90%→S, 5아웃=75%→A
 export function getGrade(score: number, maxScore: number = MAX_SCORE): { grade: string; label: string } {
   const pct = score / maxScore;
   if (pct >= 0.80) return { grade: 'S', label: '명포수' };
