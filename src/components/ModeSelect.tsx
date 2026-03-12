@@ -1,7 +1,8 @@
 import { useLanguage } from '../i18n/LanguageContext';
+import type { GameMode } from '../data/types';
 
 interface ModeSelectProps {
-  onSelectMode: (mode: 'japan' | 'dom' | 'scenario') => void;
+  onSelectMode: (mode: GameMode) => void;
 }
 
 export default function ModeSelect({ onSelectMode }: ModeSelectProps) {
@@ -23,7 +24,7 @@ export default function ModeSelect({ onSelectMode }: ModeSelectProps) {
       </p>
 
       {/* Mode cards */}
-      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-lg mb-10">
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-lg mb-4">
         {/* Japan Mode */}
         <button
           onClick={() => onSelectMode('japan')}
@@ -52,6 +53,41 @@ export default function ModeSelect({ onSelectMode }: ModeSelectProps) {
             {t('mode.dom.desc')}
           </div>
           <div className="text-slate-500 text-xs">{t('mode.dom.meta')}</div>
+        </button>
+      </div>
+
+      {/* USA & CAN Mode cards */}
+      <div className="flex flex-col sm:flex-row gap-4 w-full max-w-lg mb-4">
+        {/* Beat USA Mode */}
+        <button
+          onClick={() => onSelectMode('usa')}
+          className="flex-1 relative p-5 rounded-2xl border-2 border-slate-700 bg-slate-800/60 hover:border-red-500 hover:bg-slate-800/90 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] text-left"
+        >
+          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-black px-2 py-0.5 rounded-full">
+            NEW
+          </div>
+          <div className="text-3xl mb-3">🇨🇦 vs 🇺🇸</div>
+          <div className="text-white font-black text-xl mb-1">{t('mode.usa.title')}</div>
+          <div className="text-slate-300 text-sm font-semibold mb-2">
+            {t('mode.usa.desc')}
+          </div>
+          <div className="text-slate-500 text-xs">{t('mode.usa.meta')}</div>
+        </button>
+
+        {/* Beat CAN Mode */}
+        <button
+          onClick={() => onSelectMode('can')}
+          className="flex-1 relative p-5 rounded-2xl border-2 border-slate-700 bg-slate-800/60 hover:border-red-500 hover:bg-slate-800/90 hover:shadow-lg hover:shadow-red-500/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] text-left"
+        >
+          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-black px-2 py-0.5 rounded-full">
+            NEW
+          </div>
+          <div className="text-3xl mb-3">🇺🇸 vs 🇨🇦</div>
+          <div className="text-white font-black text-xl mb-1">{t('mode.can.title')}</div>
+          <div className="text-slate-300 text-sm font-semibold mb-2">
+            {t('mode.can.desc')}
+          </div>
+          <div className="text-slate-500 text-xs">{t('mode.can.meta')}</div>
         </button>
       </div>
 

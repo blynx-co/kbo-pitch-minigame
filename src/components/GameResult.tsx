@@ -7,6 +7,8 @@ import type { LeadScoreResult } from '../utils/scoring';
 import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 import { USA_BATTER_PROFILES } from '../data/usaBatterProfiles';
+import { CAN_BATTER_PROFILES } from '../data/canBatterProfiles';
+import { USA_MAX_SCORE, CAN_MAX_SCORE } from '../utils/scoring';
 import type { ScenarioMode, ScenarioAtBat } from '../data/lorenzenScenarios';
 
 interface GameResultProps {
@@ -14,7 +16,7 @@ interface GameResultProps {
   totalScore: number;
   difficulty?: Difficulty;
   onRestart: () => void;
-  gameMode?: 'japan' | 'dom' | 'scenario';
+  gameMode?: string;
   pitcherName?: string;
   leadScore?: LeadScoreResult;
   scenarioMode?: ScenarioMode;
@@ -54,8 +56,12 @@ function gradeColor(grade: string): string {
 export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName, leadScore, scenarioMode, selectedAtBats }: GameResultProps) {
   const { t, lang, playerName } = useLanguage();
   const [copied, setCopied] = useState(false);
-  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES };
-  const maxScore = gameMode === 'scenario' ? SCENARIO_MAX_SCORE : gameMode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
+  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES, ...CAN_BATTER_PROFILES };
+  const maxScore = gameMode === 'scenario' ? SCENARIO_MAX_SCORE
+    : gameMode === 'usa' ? USA_MAX_SCORE
+    : gameMode === 'can' ? CAN_MAX_SCORE
+    : gameMode === 'dom' ? DOM_MAX_SCORE
+    : JAPAN_MAX_SCORE;
   const isHard = difficulty === 'hard';
   const { grade } = getGrade(totalScore, maxScore);
   const pct = Math.round((totalScore / maxScore) * 100);
@@ -106,7 +112,10 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
 
   const resultTitle = gameMode === 'scenario'
     ? (lang === 'ko' ? scenarioMode?.nameKo : scenarioMode?.name) ?? t('result.scenarioTitle')
-    : gameMode === 'dom' ? t('result.domTitle') : t('result.japanTitle');
+    : gameMode === 'usa' ? t('result.usaTitle')
+    : gameMode === 'can' ? t('result.canTitle')
+    : gameMode === 'dom' ? t('result.domTitle')
+    : t('result.japanTitle');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">

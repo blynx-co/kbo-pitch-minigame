@@ -40,6 +40,11 @@ import { SCENARIO_MODES } from './data/lorenzenScenarios';
 import type { ScenarioMode, ScenarioAtBat } from './data/lorenzenScenarios';
 import { LORENZEN_PROFILE } from './data/lorenzenProfile';
 import { USA_BATTER_PROFILES } from './data/usaBatterProfiles';
+import { CAN_BATTER_PROFILES } from './data/canBatterProfiles';
+import { USA_PITCHERS } from './data/usaPitcherProfiles';
+import { CAN_PITCHERS } from './data/canPitcherProfiles';
+import { USA_LINEUPS } from './data/usaLineups';
+import { CAN_LINEUPS } from './data/canLineups';
 import { useLanguage } from './i18n/LanguageContext';
 
 const TOTAL_AT_BATS_JAPAN = SCENARIOS.length;
@@ -129,7 +134,7 @@ export default function App() {
   // Derived data based on mode
   const totalAtBats = gameMode === 'scenario'
     ? (selectedScenario?.selectCount ?? 5)
-    : gameMode === 'dom'
+    : (gameMode === 'dom' || gameMode === 'usa' || gameMode === 'can')
       ? (selectedLineup?.batterIds.length ?? 9)
       : TOTAL_AT_BATS_JAPAN;
 
@@ -149,6 +154,16 @@ export default function App() {
   } else if (gameMode === 'dom' && selectedLineup && selectedPitcher) {
     const batterId = selectedLineup.batterIds[atBat.scenarioIndex];
     batter = batterId ? DOM_BATTER_PROFILES[batterId] : null;
+    pitcher = { pitches: selectedPitcher.pitches, hand: selectedPitcher.hand, nameKo: selectedPitcher.nameKo, id: selectedPitcher.id };
+  } else if (gameMode === 'usa' && selectedLineup && selectedPitcher) {
+    // Beat USA: CAN pitcher vs USA batters
+    const batterId = selectedLineup.batterIds[atBat.scenarioIndex];
+    batter = batterId ? (USA_BATTER_PROFILES[batterId] ?? null) : null;
+    pitcher = { pitches: selectedPitcher.pitches, hand: selectedPitcher.hand, nameKo: selectedPitcher.nameKo, id: selectedPitcher.id };
+  } else if (gameMode === 'can' && selectedLineup && selectedPitcher) {
+    // Beat CAN: USA pitcher vs CAN batters
+    const batterId = selectedLineup.batterIds[atBat.scenarioIndex];
+    batter = batterId ? (CAN_BATTER_PROFILES[batterId] ?? null) : null;
     pitcher = { pitches: selectedPitcher.pitches, hand: selectedPitcher.hand, nameKo: selectedPitcher.nameKo, id: selectedPitcher.id };
   } else if (gameMode === 'scenario' && selectedScenario && selectedAtBats.length > 0) {
     const scenarioAtBat = selectedAtBats[atBat.scenarioIndex];
@@ -419,24 +434,35 @@ export default function App() {
       case 'intro':
         return <GameIntro onStart={handleStart} />;
 
-      case 'pitcher_select':
+      case 'pitcher_select': {
+        const pitcherList = gameMode === 'usa' ? CAN_PITCHERS
+          : gameMode === 'can' ? USA_PITCHERS
+          : KOR_PITCHERS;
         return (
           <PitcherSelect
-            pitchers={KOR_PITCHERS}
+            pitchers={pitcherList}
             onSelect={handleSelectPitcher}
             onBack={handleBackToModeSelect}
           />
         );
+      }
 
-      case 'lineup_select':
+      case 'lineup_select': {
+        const lineupList = gameMode === 'usa' ? USA_LINEUPS
+          : gameMode === 'can' ? CAN_LINEUPS
+          : DOM_LINEUPS;
+        const batterProfileMap = gameMode === 'usa' ? USA_BATTER_PROFILES
+          : gameMode === 'can' ? CAN_BATTER_PROFILES
+          : DOM_BATTER_PROFILES;
         return (
           <LineupSelect
-            lineups={DOM_LINEUPS}
-            batterProfiles={DOM_BATTER_PROFILES}
+            lineups={lineupList}
+            batterProfiles={batterProfileMap}
             onSelect={handleSelectLineup}
             onBack={handleBackToPitcherSelect}
           />
         );
+      }
 
       case 'scenario_select':
         return (

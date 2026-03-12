@@ -101,7 +101,7 @@ export interface PitchTrajectory {
 }
 
 // Game mode
-export type GameMode = 'japan' | 'dom' | 'scenario';
+export type GameMode = 'japan' | 'dom' | 'usa' | 'can' | 'scenario';
 
 // DOM-specific game phase adds mode_select, pitcher_select, lineup_select
 export type GamePhase =
