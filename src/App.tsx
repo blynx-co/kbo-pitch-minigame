@@ -34,6 +34,11 @@ import PitcherSelect from './components/PitcherSelect';
 import LineupSelect from './components/LineupSelect';
 import DifficultySelect from './components/DifficultySelect';
 import MissNotify from './components/MissNotify';
+import ScenarioSelect from './components/ScenarioSelect';
+import { SCENARIO_MODES } from './data/lorenzenScenarios';
+import type { ScenarioMode, ScenarioAtBat } from './data/lorenzenScenarios';
+import { LORENZEN_PROFILE } from './data/lorenzenProfile';
+import { USA_BATTER_PROFILES } from './data/usaBatterProfiles';
 
 const TOTAL_AT_BATS_JAPAN = SCENARIOS.length;
 
@@ -115,11 +120,15 @@ export default function App() {
     newStrikes: number;
   } | null>(null);
   const [atBatOver, setAtBatOver] = useState<{ result: AtBatOutcome; score: number } | null>(null);
+  const [selectedScenario, setSelectedScenario] = useState<ScenarioMode | null>(null);
+  const [selectedAtBats, setSelectedAtBats] = useState<ScenarioAtBat[]>([]);
 
   // Derived data based on mode
-  const totalAtBats = gameMode === 'dom'
-    ? (selectedLineup?.batterIds.length ?? 9)
-    : TOTAL_AT_BATS_JAPAN;
+  const totalAtBats = gameMode === 'scenario'
+    ? (selectedScenario?.selectCount ?? 5)
+    : gameMode === 'dom'
+      ? (selectedLineup?.batterIds.length ?? 9)
+      : TOTAL_AT_BATS_JAPAN;
 
   // Current batter/pitcher based on mode
   let batter: BatterProfile | null = null;
@@ -136,25 +145,57 @@ export default function App() {
     const batterId = selectedLineup.batterIds[atBat.scenarioIndex];
     batter = batterId ? DOM_BATTER_PROFILES[batterId] : null;
     pitcher = { pitches: selectedPitcher.pitches, hand: selectedPitcher.hand, nameKo: selectedPitcher.nameKo };
+  } else if (gameMode === 'scenario' && selectedScenario && selectedAtBats.length > 0) {
+    const scenarioAtBat = selectedAtBats[atBat.scenarioIndex];
+    if (scenarioAtBat) {
+      batter = USA_BATTER_PROFILES[scenarioAtBat.batterId] ?? null;
+      // Use the scenario's pitcher profile
+      if (selectedScenario.pitcherId === 'lorenzen') {
+        pitcher = { pitches: LORENZEN_PROFILE.pitches, hand: LORENZEN_PROFILE.hand, nameKo: LORENZEN_PROFILE.nameKo };
+      }
+    }
   }
 
   // Handlers
   const handleSelectMode = useCallback((mode: GameMode) => {
     setGameMode(mode);
-    setPhase('difficulty_select');
+    if (mode === 'scenario') {
+      setPhase('scenario_select');
+    } else {
+      setPhase('difficulty_select');
+    }
   }, []);
 
   const handleSelectDifficulty = useCallback((diff: Difficulty) => {
     setDifficulty(diff);
     if (gameMode === 'japan') {
       setPhase('intro');
+    } else if (gameMode === 'scenario') {
+      // Scenario mode: random select at-bats and start
+      if (selectedScenario) {
+        const shuffled = [...selectedScenario.atBats].sort(() => Math.random() - 0.5);
+        const selected = shuffled.slice(0, selectedScenario.selectCount);
+        setSelectedAtBats(selected);
+        setAtBat({ scenarioIndex: 0, balls: 0, strikes: 0, pitchHistory: [], result: null });
+        setPhase('pitch_select');
+      }
     } else {
       setPhase('pitcher_select');
     }
-  }, [gameMode]);
+  }, [gameMode, selectedScenario]);
 
   const handleBackToModeSelectFromDifficulty = useCallback(() => {
     setPhase('mode_select');
+  }, []);
+
+  const handleSelectScenario = useCallback((sc: ScenarioMode) => {
+    setSelectedScenario(sc);
+    setPhase('difficulty_select');
+  }, []);
+
+  const handleBackToModeSelectFromScenario = useCallback(() => {
+    setPhase('mode_select');
+    setSelectedScenario(null);
   }, []);
 
   const handleSelectPitcher = useCallback((p: KorPitcherProfile) => {
@@ -238,7 +279,7 @@ export default function App() {
         setPhase('animating');
       }
     },
-    [batter, pitcher, atBat.balls, atBat.strikes, difficulty],
+    [batter, pitcher, atBat.balls, atBat.strikes, difficulty, atBat.pitchHistory],
   );
 
   const handleMissNotifyDone = useCallback(() => {
@@ -292,10 +333,15 @@ export default function App() {
   const handleAtBatNext = useCallback(() => {
     if (!atBatOver) return;
 
-    // batterId: for japan use scenario, for dom use lineup
-    const batterId = gameMode === 'japan'
-      ? (scenario?.batterId ?? '')
-      : (selectedLineup?.batterIds[atBat.scenarioIndex] ?? '');
+    // batterId: for japan use scenario, for dom use lineup, for scenario use selectedAtBats
+    let batterId: string;
+    if (gameMode === 'japan') {
+      batterId = scenario?.batterId ?? '';
+    } else if (gameMode === 'scenario') {
+      batterId = selectedAtBats[atBat.scenarioIndex]?.batterId ?? '';
+    } else {
+      batterId = selectedLineup?.batterIds[atBat.scenarioIndex] ?? '';
+    }
 
     // Record completed at-bat
     const summary: AtBatSummary = {
@@ -327,7 +373,7 @@ export default function App() {
       setCurrentTrajectory(null);
       setPhase('pitch_select');
     }
-  }, [atBatOver, scenario, atBat, completedAtBats, gameMode, selectedLineup, totalAtBats]);
+  }, [atBatOver, scenario, atBat, completedAtBats, gameMode, selectedLineup, selectedAtBats, totalAtBats]);
 
   const handleRestart = useCallback(() => {
     setPhase('mode_select');
@@ -335,6 +381,8 @@ export default function App() {
     setDifficulty('normal');
     setSelectedPitcher(null);
     setSelectedLineup(null);
+    setSelectedScenario(null);
+    setSelectedAtBats([]);
     setAtBat({
       scenarioIndex: 0,
       balls: 0,
@@ -381,6 +429,15 @@ export default function App() {
           batterProfiles={DOM_BATTER_PROFILES}
           onSelect={handleSelectLineup}
           onBack={handleBackToPitcherSelect}
+        />
+      );
+
+    case 'scenario_select':
+      return (
+        <ScenarioSelect
+          scenarios={SCENARIO_MODES}
+          onSelect={handleSelectScenario}
+          onBack={handleBackToModeSelectFromScenario}
         />
       );
 
@@ -479,7 +536,11 @@ export default function App() {
           outcome={atBatOver.result}
           pitchHistory={atBat.pitchHistory}
           totalScore={atBatOver.score}
-          scenarioActualResult={scenario?.actualResult ?? ''}
+          scenarioActualResult={
+            gameMode === 'scenario'
+              ? (selectedAtBats[atBat.scenarioIndex]?.actualResult ?? '')
+              : (scenario?.actualResult ?? '')
+          }
           onNext={handleAtBatNext}
           isLastAtBat={atBat.scenarioIndex + 1 >= totalAtBats}
         />
@@ -488,6 +549,9 @@ export default function App() {
     case 'game_result': {
       const total = calculateTotalScore(completedAtBats);
       const leadScore = calculateLeadScore(completedAtBats);
+      const scenarioPitcherName = gameMode === 'scenario'
+        ? (selectedScenario?.pitcherId === 'lorenzen' ? LORENZEN_PROFILE.nameKo : undefined)
+        : selectedPitcher?.nameKo;
       return (
         <GameResult
           atBats={completedAtBats}
@@ -495,8 +559,10 @@ export default function App() {
           difficulty={difficulty}
           onRestart={handleRestart}
           gameMode={gameMode}
-          pitcherName={selectedPitcher?.nameKo}
+          pitcherName={scenarioPitcherName}
           leadScore={leadScore}
+          scenarioMode={selectedScenario ?? undefined}
+          selectedAtBats={selectedAtBats}
         />
       );
     }

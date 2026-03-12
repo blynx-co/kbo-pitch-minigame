@@ -1,5 +1,5 @@
 interface ModeSelectProps {
-  onSelectMode: (mode: 'japan' | 'dom') => void;
+  onSelectMode: (mode: 'japan' | 'dom' | 'scenario') => void;
 }
 
 export default function ModeSelect({ onSelectMode }: ModeSelectProps) {
@@ -48,6 +48,24 @@ export default function ModeSelect({ onSelectMode }: ModeSelectProps) {
             4강을 위하여
           </div>
           <div className="text-slate-500 text-xs">9타석 | 투수 선택 가능</div>
+        </button>
+      </div>
+
+      {/* Scenario Mode */}
+      <div className="w-full max-w-lg mb-10">
+        <button
+          onClick={() => onSelectMode('scenario')}
+          className="w-full relative p-5 rounded-2xl border-2 border-slate-700 bg-slate-800/60 hover:border-emerald-500 hover:bg-slate-800/90 hover:shadow-lg hover:shadow-emerald-500/20 transition-all duration-200 hover:scale-[1.02] active:scale-[0.98] text-left"
+        >
+          <div className="absolute -top-2 -right-2 bg-emerald-500 text-slate-900 text-xs font-black px-2 py-0.5 rounded-full">
+            NEW
+          </div>
+          <div className="text-3xl mb-3">🎬</div>
+          <div className="text-white font-black text-xl mb-1">시나리오 모드</div>
+          <div className="text-slate-300 text-sm font-semibold mb-2">
+            실제 WBC 명장면을 재현하고, 실제 투수를 이겨보세요
+          </div>
+          <div className="text-slate-500 text-xs">랜덤 5타석 | 실제 결과 비교</div>
         </button>
       </div>
 

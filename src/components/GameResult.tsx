@@ -1,19 +1,23 @@
 import { useState } from 'react';
 import type { AtBatOutcome, PitchOutcome, Difficulty } from '../data/types';
 import type { AtBatSummary } from '../utils/scoring';
-import { getGrade, generateShareText, copyShareText, JAPAN_MAX_SCORE, DOM_MAX_SCORE } from '../utils/scoring';
+import { getGrade, generateShareText, copyShareText, JAPAN_MAX_SCORE, DOM_MAX_SCORE, calculateBaselineScore, SCENARIO_MAX_SCORE } from '../utils/scoring';
 import type { LeadScoreResult } from '../utils/scoring';
 import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
+import { USA_BATTER_PROFILES } from '../data/usaBatterProfiles';
+import type { ScenarioMode, ScenarioAtBat } from '../data/lorenzenScenarios';
 
 interface GameResultProps {
   atBats: AtBatSummary[];
   totalScore: number;
   difficulty?: Difficulty;
   onRestart: () => void;
-  gameMode?: 'japan' | 'dom';
+  gameMode?: 'japan' | 'dom' | 'scenario';
   pitcherName?: string;
   leadScore?: LeadScoreResult;
+  scenarioMode?: ScenarioMode;
+  selectedAtBats?: ScenarioAtBat[];
 }
 
 function pitchEmoji(outcome: PitchOutcome): string {
@@ -61,13 +65,19 @@ function gradeColor(grade: string): string {
   }
 }
 
-export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName, leadScore }: GameResultProps) {
+export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName, leadScore, scenarioMode, selectedAtBats }: GameResultProps) {
   const [copied, setCopied] = useState(false);
-  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES };
-  const maxScore = gameMode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
+  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES };
+  const maxScore = gameMode === 'scenario' ? SCENARIO_MAX_SCORE : gameMode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
   const isHard = difficulty === 'hard';
   const { grade, label } = getGrade(totalScore, maxScore);
   const pct = Math.round((totalScore / maxScore) * 100);
+
+  // Scenario mode: calculate Lorenzen's baseline score for the same at-bats
+  const baselineScore = (gameMode === 'scenario' && selectedAtBats)
+    ? calculateBaselineScore(selectedAtBats.map(ab => ab.actualOutcome))
+    : null;
+  const beatBaseline = baselineScore !== null && totalScore > baselineScore;
 
   const handleCopy = async () => {
     const text = generateShareText(atBats, totalScore, gameMode, pitcherName, isHard, leadScore);
@@ -95,7 +105,9 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
       <div className="max-w-md w-full">
         {/* Title */}
         <h2 className="text-center text-lg text-slate-400 mb-1">
-          {gameMode === 'dom' ? '도미니카 챌린지 결과' : '오늘의 포수 성적표'}
+          {gameMode === 'scenario'
+            ? (scenarioMode?.nameKo ?? '시나리오 결과')
+            : gameMode === 'dom' ? '도미니카 챌린지 결과' : '오늘의 포수 성적표'}
           {isHard && <span className="ml-1 text-red-400">&#x1F525; 하드모드</span>}
         </h2>
 
@@ -121,6 +133,29 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
           </div>
           <p className="text-slate-500 text-xs mt-1">{pct}%</p>
         </div>
+
+        {/* Scenario Mode: vs Pitcher Comparison */}
+        {gameMode === 'scenario' && baselineScore !== null && (
+          <div className={`border-2 rounded-xl px-4 py-4 mb-6 text-center ${beatBaseline ? 'border-emerald-500 bg-emerald-900/20' : 'border-red-500 bg-red-900/20'}`}>
+            <p className={`text-2xl font-black mb-1 ${beatBaseline ? 'text-emerald-400' : 'text-red-400'}`}>
+              {beatBaseline ? '당신의 승리!' : `${pitcherName ?? '투수'}의 승리!`}
+            </p>
+            <div className="flex items-center justify-center gap-4 mt-2">
+              <div>
+                <p className="text-slate-400 text-xs">당신</p>
+                <p className="text-amber-400 font-black text-xl">{totalScore.toLocaleString()}</p>
+              </div>
+              <p className="text-slate-500 font-bold text-lg">vs</p>
+              <div>
+                <p className="text-slate-400 text-xs">{pitcherName ?? '실제 투수'}</p>
+                <p className="text-emerald-400 font-black text-xl">{baselineScore.toLocaleString()}</p>
+              </div>
+            </div>
+            <p className="text-slate-500 text-[10px] mt-2">
+              {scenarioMode?.pitcherLine} | {scenarioMode?.matchResult}
+            </p>
+          </div>
+        )}
 
         {/* Catcher Lead Score */}
         {leadScore && (

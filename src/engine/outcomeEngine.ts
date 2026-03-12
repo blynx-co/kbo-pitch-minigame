@@ -1,6 +1,7 @@
 import type { Zone, PitchOutcome, PitchTrajectory, PitchRecord, Difficulty } from '../data/types';
 import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
+import { USA_BATTER_PROFILES } from '../data/usaBatterProfiles';
 import {
   getPitchRepeatModifier,
   getZoneRepeatModifier,
@@ -58,7 +59,7 @@ export function determinePitchOutcome(
   strikes: number,
   hardModeContext?: HardModeContext,
 ): { outcome: PitchOutcome; actualZone: Zone } {
-  const batter = BATTER_PROFILES[batterId] || DOM_BATTER_PROFILES[batterId];
+  const batter = BATTER_PROFILES[batterId] || DOM_BATTER_PROFILES[batterId] || USA_BATTER_PROFILES[batterId];
   if (!batter) throw new Error(`Unknown batter: ${batterId}`);
 
   const isHard = hardModeContext?.difficulty === 'hard';

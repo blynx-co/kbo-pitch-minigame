@@ -1,6 +1,7 @@
 import type { PitchOutcome, PitchRecord, AtBatOutcome, Zone } from '../data/types';
 import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
+import { USA_BATTER_PROFILES } from '../data/usaBatterProfiles';
 import { RUN_VALUE_MATRIX } from '../data/runValueMatrix';
 
 // Score per pitch outcome (0-100)
@@ -125,6 +126,15 @@ export function calculateLeadScore(atBats: AtBatSummary[]): LeadScoreResult {
 export const MAX_SCORE = 3000;
 export const JAPAN_MAX_SCORE = 3000;
 export const DOM_MAX_SCORE = 6000;
+// Scenario: 5 at-bats × 600 = 3000 (same as Japan)
+export const SCENARIO_MAX_SCORE = 3000;
+
+// Calculate baseline score from real pitcher's actual outcomes
+export function calculateBaselineScore(actualOutcomes: AtBatOutcome[]): number {
+  return actualOutcomes.reduce((sum, outcome) => {
+    return sum + scoreAtBat(outcome);
+  }, 0);
+}
 
 // Grade thresholds:
 // DOM 기준: 9K=90%→S, 6K+3아웃=82%→S, 9아웃=67%→A
@@ -179,19 +189,24 @@ function atBatResultText(outcome: AtBatOutcome): string {
 export function generateShareText(
   atBats: AtBatSummary[],
   totalScore: number,
-  mode: 'japan' | 'dom' = 'japan',
+  mode: 'japan' | 'dom' | 'scenario' = 'japan',
   pitcherName?: string,
   isHard: boolean = false,
   leadScore?: LeadScoreResult,
 ): string {
-  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES };
-  const maxScore = mode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
+  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES };
+  const maxScore = mode === 'scenario' ? SCENARIO_MAX_SCORE : mode === 'dom' ? DOM_MAX_SCORE : JAPAN_MAX_SCORE;
   const { grade, label } = getGrade(totalScore, maxScore);
 
   const hardTag = isHard ? ' [\uD83D\uDD25하드모드]' : '';
-  const header = mode === 'japan'
-    ? [`\u26BE 답답하면 니가 던지던가${hardTag}`, '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 일본 \uD83C\uDDEF\uD83C\uDDF5 WBC 2026']
-    : [`\u26BE 도전! 도미니카!${hardTag}`, '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 도미니카 \uD83C\uDDE9\uD83C\uDDF4 WBC 2026', pitcherName ? `투수: ${pitcherName}` : ''];
+  let header: string[];
+  if (mode === 'scenario') {
+    header = [`\u26BE ${pitcherName ? pitcherName + '을 이겨라!' : '시나리오 모드'}${hardTag}`, '\uD83C\uDDEE\uD83C\uDDF9 이탈리아 vs 미국 \uD83C\uDDFA\uD83C\uDDF8 WBC 2026'];
+  } else if (mode === 'japan') {
+    header = [`\u26BE 답답하면 니가 던지던가${hardTag}`, '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 일본 \uD83C\uDDEF\uD83C\uDDF5 WBC 2026'];
+  } else {
+    header = [`\u26BE 도전! 도미니카!${hardTag}`, '\uD83C\uDDF0\uD83C\uDDF7 한국 vs 도미니카 \uD83C\uDDE9\uD83C\uDDF4 WBC 2026', pitcherName ? `투수: ${pitcherName}` : ''];
+  }
 
   const lines = atBats.map((ab) => {
     const batter = allProfiles[ab.batterId];
