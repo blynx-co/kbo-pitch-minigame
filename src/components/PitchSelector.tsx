@@ -67,7 +67,7 @@ export default function PitchSelector({
                     </span>
                   </div>
                   <p className="text-slate-400 text-xs">
-                    {pitch.avgSpeed} km/h
+                    {pitch.avgSpeed} mph
                   </p>
                   <p className="text-slate-500 text-[10px] mt-0.5 line-clamp-1">
                     {movementLabel(pitch.movement)}
@@ -94,7 +94,7 @@ export default function PitchSelector({
             style={{ backgroundColor: color }}
           />
           <span className="text-white font-bold">{pitchName(selectedPitch.code)}</span>
-          <span className="text-slate-400 text-sm">{selectedPitch.avgSpeed} km/h</span>
+          <span className="text-slate-400 text-sm">{selectedPitch.avgSpeed} mph</span>
         </div>
 
         {/* Change button */}
