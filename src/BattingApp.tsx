@@ -187,14 +187,20 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
       if (abResult === 'hit') newAtBatsLeft += 2;
       if (abResult === 'homerun') {
         setHomerunCount(prev => prev + 1);
-        newAtBatsLeft += 2;
+        setHitCount(prev => prev + 1);
+        // Homerun = instant victory!
+        setRecords(newRecords);
+        setAtBatsLeft(newAtBatsLeft);
+        gameAudio.stopAmbient();
+        gameAudio.onVictory();
+        setPhase('game_result');
+        return;
       }
-      if (abResult === 'hit' || abResult === 'homerun') setHitCount(prev => prev + 1);
+      if (abResult === 'hit') setHitCount(prev => prev + 1);
       setAtBatsLeft(newAtBatsLeft);
 
       if (newAtBatsLeft <= 0) {
         gameAudio.stopAmbient();
-        if (homerunCount + (abResult === 'homerun' ? 1 : 0) > 0) gameAudio.onVictory();
         setPhase('game_result');
       } else {
         setPhase('at_bat_result');
