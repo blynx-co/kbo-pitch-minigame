@@ -222,7 +222,7 @@ export const ko: Translations = {
   // === PitcherSelect ===
   'pitcher.back': '뒤로',
   'pitcher.title': '투수를 선택하세요',
-  'pitcher.subtitle': '도미니카 타선을 막을 투수를 고르세요',
+  'pitcher.subtitle': 'KIA 타선을 막을 투수를 고르세요',
   'pitcher.subtitle.usa': '미국 타선을 막을 캐나다 투수를 고르세요',
   'pitcher.subtitle.can': '캐나다 타선을 막을 미국 투수를 고르세요',
   'pitcher.rightHand': '우투',
@@ -281,7 +281,7 @@ export const ko: Translations = {
   // === LineupSelect ===
   'lineup.back': '뒤로',
   'lineup.title': '상대 라인업을 선택하세요',
-  'lineup.subtitle': '도미니카 타선 구성을 고르세요',
+  'lineup.subtitle': 'KIA 타선 구성을 고르세요',
 
   // Lineup descriptions
   'lineup.desc.power': '장타력 중심. 소토-타티스-블라디-마차도-카미네로-JRod-마르테-페냐-웰스',
