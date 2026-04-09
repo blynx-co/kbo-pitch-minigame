@@ -10,24 +10,24 @@ interface BatterViewSceneProps {
 }
 
 /**
- * Batter's eye view — camera behind the batter looking toward the mound.
- * The ball comes flying TOWARD the camera.
+ * Batter's eye view — camera behind home plate looking toward the mound.
+ * Ball travels from z=-55 (mound) to z=0 (plate).
+ * Camera placed slightly behind plate looking toward negative z (mound).
  */
 export default function BatterViewScene({ pitch, isAnimating, onAnimationComplete }: BatterViewSceneProps) {
   return (
     <div className="w-full h-full bg-slate-950">
       <Canvas
         camera={{
-          // Batter's eye: slightly behind and above home plate
-          // Left-handed batter stands on right side (catcher POV), so offset left from batter's POV
-          position: [1.5, 4.0, -2],
-          fov: 45,
+          // Behind home plate, left-handed batter's eye
+          position: [1.2, 3.8, 3],
+          fov: 40,
           near: 0.1,
           far: 500,
         }}
         onCreated={({ camera }) => {
-          // Look toward the pitcher's mound
-          camera.lookAt(0, 3, 55);
+          // Look toward the mound (z = -55)
+          camera.lookAt(0, 2.5, -55);
         }}
       >
         <BatterBox
@@ -39,6 +39,7 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
           pitch={pitch}
           isAnimating={isAnimating}
           onAnimationComplete={onAnimationComplete}
+          animationSpeed={0.4}
         />
       </Canvas>
     </div>
