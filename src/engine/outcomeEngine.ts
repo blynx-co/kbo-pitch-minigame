@@ -267,15 +267,17 @@ export function generatePitchTrajectory(
   const gravity = -32.17;
 
   // Pitch-type specific movement profiles
+  // aZ: gravity + spin lift. More negative = more drop.
+  // Curves/splitters have extreme negative aZ → solver gives high initial vZ0 → ball rises THEN drops hard.
   const movements: Record<string, { aX: number; aY: number; aZ: number }> = {
     FF: { aX: pitcherHand === 'R' ? -8 : 8, aY: -30, aZ: gravity + 16 },     // Rising action (high spin)
-    SI: { aX: pitcherHand === 'R' ? -14 : 14, aY: -30, aZ: gravity + 8 },    // Arm-side run + sink
-    SL: { aX: pitcherHand === 'R' ? 6 : -6, aY: -28, aZ: gravity + 2 },      // Glove-side sweep
-    CU: { aX: pitcherHand === 'R' ? 4 : -4, aY: -26, aZ: gravity - 8 },      // Big drop
-    CH: { aX: pitcherHand === 'R' ? -12 : 12, aY: -28, aZ: gravity + 4 },    // Arm-side fade + drop
-    FC: { aX: pitcherHand === 'R' ? 2 : -2, aY: -30, aZ: gravity + 10 },     // Slight cut
-    ST: { aX: pitcherHand === 'R' ? 10 : -10, aY: -28, aZ: gravity + 0 },    // Big sweep
-    FS: { aX: pitcherHand === 'R' ? -6 : 6, aY: -28, aZ: gravity - 4 },      // Split/drop
+    SI: { aX: pitcherHand === 'R' ? -14 : 14, aY: -30, aZ: gravity + 6 },    // Arm-side run + sink
+    SL: { aX: pitcherHand === 'R' ? 8 : -8, aY: -28, aZ: gravity - 2 },      // Glove-side sweep + slight drop
+    CU: { aX: pitcherHand === 'R' ? 5 : -5, aY: -24, aZ: gravity - 20 },     // Floats up then DROPS hard (12-6)
+    CH: { aX: pitcherHand === 'R' ? -12 : 12, aY: -28, aZ: gravity + 2 },    // Arm-side fade + drop
+    FC: { aX: pitcherHand === 'R' ? 3 : -3, aY: -30, aZ: gravity + 10 },     // Slight cut
+    ST: { aX: pitcherHand === 'R' ? 12 : -12, aY: -28, aZ: gravity - 4 },    // Big sweep + drop
+    FS: { aX: pitcherHand === 'R' ? -4 : 4, aY: -28, aZ: gravity - 16 },     // Fastball plane → falls off table
   };
 
   const mov = movements[pitchCode] || movements.FF;

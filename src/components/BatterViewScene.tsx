@@ -37,7 +37,7 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
           pitch={pitch}
           isAnimating={isAnimating}
           onAnimationComplete={onAnimationComplete}
-          animationSpeed={0.4}
+          animationSpeed={0.5}
           ballScale={5}
           glowIntensity={0.8}
         />
