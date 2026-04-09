@@ -39,7 +39,7 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
     setBallVisible(true);
     startTime.current = performance.now();
     completedRef.current = false;
-    const duration = pitch.plateTime * (1 / 0.5) * 1000; // match animationSpeed=0.5
+    const duration = pitch.plateTime * (1 / 0.8) * 1000; // faster ball
 
     const target = getTargetPos();
 
