@@ -1,10 +1,14 @@
 /**
- * Batting outcome engine — determines result when Noh Si-hwan swings or takes.
+ * Batting outcome engine — timing + zone accuracy → realistic outcomes.
  *
- * Key factors:
- * - Timing quality (how well the player timed the swing)
- * - Zone accuracy (clicked zone vs actual pitch zone, with skill-gap error)
- * - Noh Si-hwan's stats vs Yamamoto's pitch type
+ * Rules:
+ * - TAKE: ball in zone 1-9 = called strike, zone 11-14 = ball
+ * - SWING timing:
+ *   PERFECT (0.65-0.85): clean contact → HR/hit/out possible
+ *   GOOD (0.50-0.65 or 0.85-0.92): topped/under → groundout, some singles
+ *   EARLY (<0.50): way ahead → mostly whiff, some weak groundout
+ *   LATE (>0.92): behind → mostly whiff, some foul
+ * - Zone match: perfect match = solid, adjacent = glancing, far = miss
  */
 import type { Zone, PitchOutcome } from '../data/types';
 import { NOH_SIHWAN } from '../data/nohSihwanProfile';
@@ -15,7 +19,6 @@ function isStrikeZone(zone: Zone): boolean {
   return STRIKE_ZONES.includes(zone);
 }
 
-// Zone adjacency for determining contact quality
 const ZONE_ADJACENCY: Record<Zone, Zone[]> = {
   1: [2, 4, 5],    2: [1, 3, 4, 5, 6],   3: [2, 5, 6],
   4: [1, 2, 5, 7, 8], 5: [1, 2, 3, 4, 6, 7, 8, 9], 6: [2, 3, 5, 8, 9],
@@ -27,61 +30,49 @@ export type TimingQuality = 'perfect' | 'good' | 'early' | 'late' | 'way_off';
 
 export interface BattingResult {
   outcome: PitchOutcome;
-  description: string;  // Korean description for display
+  description: string;
   timingQuality: TimingQuality;
-  swingZoneAfterError: Zone | null;  // where bat actually went (after skill error)
+  swingZoneAfterError: Zone | null;
 }
 
 /**
- * Apply random swing error reflecting MLB ace vs KBO .250 hitter skill gap.
- * ~35% chance the swing drifts to adjacent zone, ~10% to random zone.
+ * Swing error: 55% accurate, 35% adjacent, 10% wild
  */
 export function applySwingError(targetZone: Zone): Zone {
   const roll = Math.random();
-
-  // 55% → on target
   if (roll < 0.55) return targetZone;
-
-  // 35% → drift to adjacent zone
   if (roll < 0.90) {
     const adj = ZONE_ADJACENCY[targetZone];
-    if (adj && adj.length > 0) {
-      return adj[Math.floor(Math.random() * adj.length)];
-    }
-    return targetZone;
+    return adj && adj.length > 0 ? adj[Math.floor(Math.random() * adj.length)] : targetZone;
   }
-
-  // 10% → wild swing (random zone)
-  const allZones: Zone[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14];
-  return allZones[Math.floor(Math.random() * allZones.length)];
+  const all: Zone[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14];
+  return all[Math.floor(Math.random() * all.length)];
 }
 
 /**
- * Calculate timing quality from the player's click timing.
- * @param clickRatio - when the player clicked relative to ball flight (0 = pitch start, 1 = ball arrival)
+ * Timing quality from click ratio (0 = pitch start, 1 = ball arrival)
  */
 export function getTimingQuality(clickRatio: number): TimingQuality {
-  // Sweet spot: 0.65 - 0.85 of flight time
   if (clickRatio >= 0.65 && clickRatio <= 0.85) return 'perfect';
   if (clickRatio >= 0.50 && clickRatio <= 0.92) return 'good';
+  if (clickRatio < 0.35) return 'way_off';
   if (clickRatio < 0.50) return 'early';
-  if (clickRatio > 0.92) return 'late';
-  return 'way_off';
+  return 'late'; // > 0.92
 }
 
 /**
- * Main batting outcome determination.
+ * Main batting outcome.
  */
 export function determineBattingOutcome(
   action: 'swing' | 'take',
-  playerSwingZone: Zone | null,  // null if take
+  playerSwingZone: Zone | null,
   actualPitchZone: Zone,
   pitchCode: string,
   timing: TimingQuality,
 ): BattingResult {
   const batter = NOH_SIHWAN;
 
-  // === TAKE (보내기) ===
+  // === TAKE ===
   if (action === 'take' || !playerSwingZone) {
     if (isStrikeZone(actualPitchZone)) {
       return { outcome: 'called_strike', description: '스트라이크! 쳐야 했다...', timingQuality: timing, swingZoneAfterError: null };
@@ -90,82 +81,117 @@ export function determineBattingOutcome(
     }
   }
 
-  // === SWING (스윙) ===
-  // Apply skill-gap error to swing zone
+  // === SWING ===
   const actualSwingZone = applySwingError(playerSwingZone);
-
-  // Zone match quality
   const perfectMatch = actualSwingZone === actualPitchZone;
   const adjacent = ZONE_ADJACENCY[actualPitchZone]?.includes(actualSwingZone) ?? false;
 
-  // Timing multiplier
-  let timingMult: number;
-  switch (timing) {
-    case 'perfect': timingMult = 1.0; break;
-    case 'good':    timingMult = 0.6; break;
-    case 'early':   timingMult = 0.2; break;
-    case 'late':    timingMult = 0.15; break;
-    default:        timingMult = 0.05;
-  }
-
-  // Base stats
   const zoneStats = batter.zones[actualPitchZone];
   const pitchStats = batter.pitchTypeStats[pitchCode] ?? { ba: 0.200, whiffRate: 0.35 };
+  const hrRate = zoneStats.hrRate;
 
-  // Contact quality multiplier based on zone match
-  let contactQuality: number;
-  if (perfectMatch) {
-    contactQuality = 1.0;
-  } else if (adjacent) {
-    contactQuality = 0.4;
-  } else {
-    contactQuality = 0.05;  // way off → almost certain miss
+  // === WAY OFF timing → always whiff ===
+  if (timing === 'way_off') {
+    return { outcome: 'swinging_strike', description: '타이밍 완전 빗나감! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   }
 
-  // Combined contact chance
-  const combinedQuality = contactQuality * timingMult;
-
-  // Step 1: Whiff check
-  const baseWhiff = (zoneStats.whiffRate * 0.4 + pitchStats.whiffRate * 0.6);
-  const whiffProb = Math.min(0.95, baseWhiff + (1 - combinedQuality) * 0.5);
-
-  if (Math.random() < whiffProb) {
-    const desc = timing === 'perfect' && perfectMatch
-      ? '아슬하게 빗나갔다!'
-      : timing === 'early' ? '너무 빨랐다! 헛스윙!'
-      : timing === 'late' ? '타이밍 늦었다! 헛스윙!'
-      : '헛스윙!';
-    return { outcome: 'swinging_strike', description: desc, timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  // === EARLY timing → mostly whiff, some weak groundout ===
+  if (timing === 'early') {
+    // Far zone = guaranteed whiff
+    if (!perfectMatch && !adjacent) {
+      return { outcome: 'swinging_strike', description: '너무 빨랐다! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
+    // Matched zone but early → topped ball
+    const roll = Math.random();
+    if (roll < 0.55) {
+      return { outcome: 'swinging_strike', description: '너무 빨랐다! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
+    if (roll < 0.80) {
+      return { outcome: 'foul', description: '파울! 살짝 걸렸다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
+    return { outcome: 'groundout', description: '땅볼... 타이밍이 빨랐다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   }
 
-  // Step 2: Foul check
-  const foulProb = perfectMatch ? 0.25 : adjacent ? 0.45 : 0.60;
-  if (Math.random() < foulProb * (1.1 - timingMult)) {
-    return { outcome: 'foul', description: '파울!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  // === LATE timing → mostly whiff/foul, some weak groundout ===
+  if (timing === 'late') {
+    if (!perfectMatch && !adjacent) {
+      return { outcome: 'swinging_strike', description: '늦었다! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
+    const roll = Math.random();
+    if (roll < 0.50) {
+      return { outcome: 'swinging_strike', description: '타이밍 늦었다! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
+    if (roll < 0.80) {
+      return { outcome: 'foul', description: '파울! 늦게 걸렸다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
+    return { outcome: 'groundout', description: '땅볼... 타이밍이 늦었다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   }
 
-  // Step 3: Ball in play — determine outcome
-  const ba = pitchStats.ba * combinedQuality;
-  const hrRate = zoneStats.hrRate * combinedQuality * timingMult;
+  // === GOOD timing → topped/under contact → groundout/some singles ===
+  if (timing === 'good') {
+    // Far zone = whiff
+    if (!perfectMatch && !adjacent) {
+      return { outcome: 'swinging_strike', description: '헛스윙! 코스가 안 맞았다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
 
-  // Homerun check (boosted for perfect timing + perfect zone)
-  const hrBonus = (timing === 'perfect' && perfectMatch) ? 2.5 : 1.0;
-  if (Math.random() < hrRate * hrBonus) {
+    // Adjacent zone = weak contact
+    if (!perfectMatch && adjacent) {
+      const roll = Math.random();
+      if (roll < 0.25) return { outcome: 'foul', description: '파울!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      if (roll < 0.70) return { outcome: 'groundout', description: '땅볼... 맞긴 했는데', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      if (roll < 0.90) return { outcome: 'flyout', description: '뜬공 아웃...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      return { outcome: 'single', description: '안타! 잘 맞진 않았지만', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
+
+    // Perfect zone match + good timing → decent contact
+    const roll = Math.random();
+    const ba = pitchStats.ba;
+    if (roll < 0.15) return { outcome: 'foul', description: '파울! 아깝다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.15 + (1 - ba) * 0.5) return { outcome: 'groundout', description: '땅볼... 타이밍이 살짝', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.15 + (1 - ba) * 0.5 + 0.15) return { outcome: 'flyout', description: '뜬공 아웃...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.95) return { outcome: 'single', description: '안타!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    return { outcome: 'double', description: '2루타! 좋은 타격!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  }
+
+  // === PERFECT timing ===
+
+  // Far zone = whiff (even with perfect timing, can't reach)
+  if (!perfectMatch && !adjacent) {
+    const roll = Math.random();
+    if (roll < 0.60) return { outcome: 'swinging_strike', description: '헛스윙! 코스 판단이 빗나갔다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    return { outcome: 'foul', description: '파울! 간신히 닿았다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  }
+
+  // Adjacent zone + perfect timing → contact but not clean
+  if (!perfectMatch && adjacent) {
+    const roll = Math.random();
+    if (roll < 0.10) return { outcome: 'foul', description: '파울!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.40) return { outcome: 'groundout', description: '땅볼 아웃...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.60) return { outcome: 'flyout', description: '뜬공 아웃...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.90) return { outcome: 'single', description: '안타!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.97) return { outcome: 'double', description: '2루타!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    return { outcome: 'homerun', description: '홈런!!! 잘 걸렸다!!!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  }
+
+  // === PERFECT timing + PERFECT zone match → BEST CONTACT ===
+  const roll = Math.random();
+  const hrBonus = hrRate * 3.0; // boosted for perfect contact
+
+  // Homerun check first
+  if (roll < hrBonus) {
     return { outcome: 'homerun', description: '홈런!!! 달을 쐈다!!!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   }
 
-  // Hit vs out
-  const hitProb = (zoneStats.wOBA * 0.5 + ba * 0.5) * combinedQuality;
-  if (Math.random() < hitProb) {
-    const r = Math.random();
-    if (r < 0.05) return { outcome: 'triple', description: '3루타! 장타력 폭발!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-    if (r < 0.30) return { outcome: 'double', description: '2루타!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-    return { outcome: 'single', description: '안타!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  // Hit distribution
+  const hitChance = pitchStats.ba * 1.5; // boosted for perfect contact
+  if (roll < hrBonus + hitChance * 0.6) {
+    const hitRoll = Math.random();
+    if (hitRoll < 0.10) return { outcome: 'triple', description: '3루타! 장타력 폭발!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (hitRoll < 0.35) return { outcome: 'double', description: '2루타! 통쾌한 타격!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    return { outcome: 'single', description: '안타! 깔끔한 타격!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   }
 
   // Out
-  const outRoll = Math.random();
-  const desc = outRoll < 0.45 ? '땅볼 아웃...' : outRoll < 0.80 ? '뜬공 아웃...' : '라인아웃...';
-  const outType = outRoll < 0.45 ? 'groundout' : outRoll < 0.80 ? 'flyout' : 'lineout';
-  return { outcome: outType as PitchOutcome, description: desc, timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  if (roll < 0.85) return { outcome: 'flyout', description: '깊은 외야 플라이... 아깝다!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  return { outcome: 'lineout', description: '라인드라이브! 하지만 정면...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
 }
