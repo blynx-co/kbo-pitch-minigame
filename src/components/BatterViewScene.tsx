@@ -125,7 +125,7 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
             <button
               key={z}
               onClick={() => onSwing?.(z)}
-              className="border border-amber-400/25 hover:bg-amber-400/20 active:bg-amber-400/50 transition-colors cursor-crosshair"
+              className="border border-amber-400/30 bg-transparent hover:bg-amber-400/30 hover:border-amber-400/80 active:bg-red-500/50 active:scale-95 transition-all duration-75 cursor-crosshair relative z-20"
             />
           ))}
         </div>

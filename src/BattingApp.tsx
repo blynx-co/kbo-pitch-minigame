@@ -96,10 +96,9 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     setPhase('windup');
   }, [balls, strikes]);
 
-  // Player swings — works in both windup and pitch_flying phases
+  // Player swings
   const handleSwing = useCallback((zone: Zone) => {
     if (!currentPitch) return;
-    if (phase !== 'windup' && phase !== 'pitch_flying') return;
 
     let timing: ReturnType<typeof getTimingQuality>;
     if (!ballLaunched) {
@@ -304,8 +303,8 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
           />
         </div>
 
-        {/* Status + Take button at bottom */}
-        <div className="absolute bottom-[18vh] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none">
+        {/* Status + Take button at bottom (z-index below zone grid) */}
+        <div className="absolute bottom-[18vh] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none z-[5]">
           <div>
             {phase === 'windup' ? (
               <p className="text-amber-400 text-sm font-bold animate-pulse drop-shadow-lg">
