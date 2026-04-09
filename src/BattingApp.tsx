@@ -52,25 +52,9 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     }
   }, [phase]);
 
-  // Windup → after 3s, launch ball (but keep zone grid visible)
+  // Windup → after 3s, launch ball
   useEffect(() => {
     if (phase === 'windup') {
-      // Pre-select pitch during windup (hidden from player)
-      const pitch = yamamotoSelectPitch(balls, strikes);
-      setCurrentPitch(pitch);
-      setBallLaunched(false);
-
-      const traj = generatePitchTrajectory(
-        pitch.pitchCode,
-        pitch.zone,
-        YAMAMOTO_PROFILE.pitches.find(p => p.code === pitch.pitchCode)?.avgSpeed ?? 95,
-        'R', 'L',
-      );
-      setTrajectory(traj);
-      plateTime.current = traj.plateTime;
-      setPitchesThisAB(prev => prev + 1);
-
-      // After 3 seconds, launch the ball
       const timer = setTimeout(() => {
         pitchStartTime.current = Date.now();
         setBallLaunched(true);
@@ -78,7 +62,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [phase, balls, strikes]);
+  }, [phase]);
 
   const startSound = useCallback(() => {
     if (!soundStarted) {
@@ -94,9 +78,23 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
   }, [startSound]);
 
   const handleReady = useCallback(() => {
+    // Generate pitch synchronously BEFORE phase change
+    const pitch = yamamotoSelectPitch(balls, strikes);
+    setCurrentPitch(pitch);
+    setBallLaunched(false);
+
+    const traj = generatePitchTrajectory(
+      pitch.pitchCode,
+      pitch.zone,
+      YAMAMOTO_PROFILE.pitches.find(p => p.code === pitch.pitchCode)?.avgSpeed ?? 95,
+      'R', 'L',
+    );
+    setTrajectory(traj);
+    plateTime.current = traj.plateTime;
+    setPitchesThisAB(prev => prev + 1);
     setLastResult(null);
     setPhase('windup');
-  }, []);
+  }, [balls, strikes]);
 
   // Player swings — works in both windup and pitch_flying phases
   const handleSwing = useCallback((zone: Zone) => {
@@ -115,7 +113,14 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
 
     const result = determineBattingOutcome('swing', zone, currentPitch.zone, currentPitch.pitchCode, timing);
     setLastResult(result);
-    gameAudio.onPitchOutcome(result.outcome);
+
+    // Swing sound: always play bat swing, then hit sound if contact
+    gameAudio.onPitchOutcome('swinging_strike'); // bat whoosh
+    if (result.outcome !== 'swinging_strike') {
+      // Contact made — play bat crack after short delay
+      setTimeout(() => gameAudio.onPitchOutcome(result.outcome), 150);
+    }
+
     setPhase('outcome');
   }, [phase, currentPitch, ballLaunched]);
 
