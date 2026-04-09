@@ -182,24 +182,23 @@ export function determineBattingOutcome(
   }
 
   // === PERFECT timing + PERFECT zone match → BEST CONTACT ===
+  // Target: ~18% HR, ~30% hit, ~30% out (before swing error)
   const roll = Math.random();
-  const hrBonus = hrRate * 3.0; // boosted for perfect contact
+  const hrBonus = hrRate * 3.0;
 
-  // Homerun check first
   if (roll < hrBonus) {
     return { outcome: 'homerun', description: '홈런!!! 달을 쐈다!!!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   }
 
-  // Hit distribution
-  const hitChance = pitchStats.ba * 1.5; // boosted for perfect contact
-  if (roll < hrBonus + hitChance * 0.6) {
+  // Hit: ~48% of remaining → ~40% total hits (HR + hits)
+  if (roll < hrBonus + 0.48) {
     const hitRoll = Math.random();
     if (hitRoll < 0.10) return { outcome: 'triple', description: '3루타! 장타력 폭발!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
     if (hitRoll < 0.35) return { outcome: 'double', description: '2루타! 통쾌한 타격!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
     return { outcome: 'single', description: '안타! 깔끔한 타격!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   }
 
-  // Out
-  if (roll < 0.85) return { outcome: 'flyout', description: '깊은 외야 플라이... 아깝다!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  // Out: ~34% remaining
+  if (roll < 0.88) return { outcome: 'flyout', description: '깊은 외야 플라이... 아깝다!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   return { outcome: 'lineout', description: '라인드라이브! 하지만 정면...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
 }
