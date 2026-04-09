@@ -23,7 +23,7 @@ export default function MissNotify({ targetZone, actualZone, onDone }: MissNotif
 
   return (
     <div
-      className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 cursor-pointer"
+      className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 cursor-pointer"
       onClick={onDone}
     >
       <div className="bg-red-900/60 border-2 border-red-500/50 rounded-2xl p-8 max-w-sm w-full text-center animate-bounce">

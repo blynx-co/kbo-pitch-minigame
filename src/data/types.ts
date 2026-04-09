@@ -101,7 +101,7 @@ export interface PitchTrajectory {
 }
 
 // Game mode
-export type GameMode = 'japan' | 'dom' | 'usa' | 'can' | 'scenario';
+export type GameMode = 'japan' | 'dom' | 'usa' | 'can' | 'kbo' | 'scenario';
 
 // DOM-specific game phase adds mode_select, pitcher_select, lineup_select
 export type GamePhase =
@@ -116,6 +116,7 @@ export type GamePhase =
   | 'animating'
   | 'outcome'
   | 'at_bat_result'
+  | 'inning_transition'
   | 'game_result';
 
 // Korean pitcher profile for DOM mode
@@ -127,6 +128,7 @@ export interface KorPitcherProfile {
   style: string;
   description: string;
   pitches: PitchOption[];
+  pitchLimit?: number; // 한계 투구수 — 초과 시 구속↓ 제구력↓
 }
 
 // DOM lineup configuration

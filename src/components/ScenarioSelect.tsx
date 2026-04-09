@@ -11,7 +11,7 @@ export default function ScenarioSelect({ scenarios, onSelect, onBack }: Scenario
   const { t, lang } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
+    <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
       <div className="max-w-md w-full">
         {/* Back button */}
         <button

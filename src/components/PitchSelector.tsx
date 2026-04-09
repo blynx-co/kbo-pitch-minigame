@@ -31,7 +31,7 @@ export default function PitchSelector({
   if (!selectedPitch) {
     // Step 1: Pick pitch type
     return (
-      <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 pt-16 pb-8">
+      <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 pt-16 pb-8">
         <div className="max-w-md w-full">
           {/* Count display */}
           <div className="text-center mb-6">
@@ -85,7 +85,7 @@ export default function PitchSelector({
   const color = getPitchColor(selectedPitch.code);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 pt-16 pb-8">
+    <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 pt-16 pb-8">
       <div className="max-w-md w-full flex flex-col items-center">
         {/* Selected pitch info */}
         <div className="flex items-center gap-2 mb-2">

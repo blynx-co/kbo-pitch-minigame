@@ -11,7 +11,7 @@ export default function DifficultySelect({ gameMode, onSelect, onBack }: Difficu
   const { t } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-6 text-center">
+    <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-6 text-center">
       <div className="w-24 h-0.5 bg-amber-500 mb-8 rounded-full" />
 
       <h1 className="text-3xl sm:text-4xl font-black text-white tracking-tight mb-2">

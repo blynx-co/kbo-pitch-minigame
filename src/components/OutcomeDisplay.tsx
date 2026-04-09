@@ -102,7 +102,7 @@ export default function OutcomeDisplay({
   const isMiss = difficulty === 'hard' && actualZone !== undefined && actualZone !== zone;
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 pt-16 pb-8">
+    <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 pt-16 pb-8">
       <div className={`${style.bg} border border-slate-700 rounded-2xl p-8 max-w-md w-full text-center`}>
         {/* Outcome label */}
         <h2 className={`text-4xl font-black ${style.text} mb-2`}>

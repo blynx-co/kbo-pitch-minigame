@@ -3,6 +3,7 @@ import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 import { USA_BATTER_PROFILES } from '../data/usaBatterProfiles';
 import { CAN_BATTER_PROFILES } from '../data/canBatterProfiles';
+import { KBO_BATTER_PROFILES } from '../data/kboBatterProfiles';
 import { RUN_VALUE_MATRIX } from '../data/runValueMatrix';
 import { ko } from '../i18n/ko';
 import { en } from '../i18n/en';
@@ -148,6 +149,9 @@ export const SCENARIO_MAX_SCORE = 3000;
 export const USA_MAX_SCORE = 5400;
 export const CAN_MAX_SCORE = 5400;
 
+// KBO: 9 at-bats × 600 = 5400
+export const KBO_MAX_SCORE = 5400;
+
 // Calculate baseline score from real pitcher's actual outcomes
 export function calculateBaselineScore(actualOutcomes: AtBatOutcome[]): number {
   return actualOutcomes.reduce((sum, outcome) => {
@@ -212,10 +216,11 @@ export function generateShareText(
   leadScore?: LeadScoreResult,
   lang: 'ko' | 'en' = 'ko',
 ): string {
-  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES, ...CAN_BATTER_PROFILES };
+  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES, ...CAN_BATTER_PROFILES, ...KBO_BATTER_PROFILES };
   const maxScore = mode === 'scenario' ? SCENARIO_MAX_SCORE
     : mode === 'usa' ? USA_MAX_SCORE
     : mode === 'can' ? CAN_MAX_SCORE
+    : mode === 'kbo' ? (atBats.length * 200) || KBO_MAX_SCORE // Dynamic based on actual at-bats
     : mode === 'dom' ? DOM_MAX_SCORE
     : JAPAN_MAX_SCORE;
   const { grade, label } = getGrade(totalScore, maxScore, lang);
@@ -237,6 +242,12 @@ export function generateShareText(
     header = [
       tr('share.canHeader', lang) + hardTag,
       tr('share.canSubheader', lang),
+      pitcherName ? tr('share.pitcher', lang).replace('{name}', pitcherName) : '',
+    ];
+  } else if (mode === 'kbo') {
+    header = [
+      (lang === 'ko' ? '🦅 한화 vs KIA 🐯' : '🦅 Hanwha vs KIA 🐯') + hardTag,
+      lang === 'ko' ? 'KBO 피치 시퀀스 게임' : 'KBO Pitch Sequence Game',
       pitcherName ? tr('share.pitcher', lang).replace('{name}', pitcherName) : '',
     ];
   } else if (mode === 'japan') {

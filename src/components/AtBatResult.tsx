@@ -77,7 +77,7 @@ export default function AtBatResult({
   const { text, color } = outcomeLabel(outcome, t);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
+    <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
       <div className="bg-slate-800/80 border border-slate-700 rounded-2xl p-6 max-w-md w-full text-center">
         {/* Batter name */}
         <p className="text-slate-400 text-sm mb-1">vs {playerName(batter.nameKo, batter.id)}</p>

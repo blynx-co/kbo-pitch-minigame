@@ -155,25 +155,28 @@ const OPPOSITE_ZONES: Record<Zone, Zone[]> = {
 
 const ALL_ZONES: Zone[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14];
 
-export function applyLocationVariance(targetZone: Zone): { actualZone: Zone; isMiss: boolean } {
+export function applyLocationVariance(targetZone: Zone, fatigued: boolean = false): { actualZone: Zone; isMiss: boolean } {
   const roll = Math.random();
 
-  // 70% → on target
-  if (roll < 0.70) {
+  // Fatigued: 40% on target, 30% adjacent, 20% random, 10% opposite
+  // Normal:  70% on target, 18% adjacent,  9% random,  3% opposite
+  const onTarget  = fatigued ? 0.40 : 0.70;
+  const adjacent  = fatigued ? 0.70 : 0.88;
+  const random    = fatigued ? 0.90 : 0.97;
+
+  if (roll < onTarget) {
     return { actualZone: targetZone, isMiss: false };
   }
 
-  // 18% → adjacent zone
-  if (roll < 0.88) {
-    const adjacent = ZONE_ADJACENCY[targetZone];
-    const picked = adjacent[Math.floor(Math.random() * adjacent.length)];
+  if (roll < adjacent) {
+    const adj = ZONE_ADJACENCY[targetZone];
+    const picked = adj[Math.floor(Math.random() * adj.length)];
     return { actualZone: picked, isMiss: true };
   }
 
-  // 9% → random zone (excluding target and adjacent)
-  if (roll < 0.97) {
-    const adjacent = ZONE_ADJACENCY[targetZone];
-    const candidates = ALL_ZONES.filter(z => z !== targetZone && !adjacent.includes(z));
+  if (roll < random) {
+    const adj = ZONE_ADJACENCY[targetZone];
+    const candidates = ALL_ZONES.filter(z => z !== targetZone && !adj.includes(z));
     if (candidates.length === 0) {
       return { actualZone: targetZone, isMiss: false };
     }
@@ -181,7 +184,6 @@ export function applyLocationVariance(targetZone: Zone): { actualZone: Zone; isM
     return { actualZone: picked, isMiss: true };
   }
 
-  // 3% → opposite zone (wild miss)
   const opposite = OPPOSITE_ZONES[targetZone];
   const picked = opposite[Math.floor(Math.random() * opposite.length)];
   return { actualZone: picked, isMiss: true };

@@ -2,6 +2,8 @@ import type { Zone, PitchOutcome, PitchTrajectory, PitchRecord, Difficulty } fro
 import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 import { USA_BATTER_PROFILES } from '../data/usaBatterProfiles';
+import { CAN_BATTER_PROFILES } from '../data/canBatterProfiles';
+import { KBO_BATTER_PROFILES } from '../data/kboBatterProfiles';
 import {
   getPitchRepeatModifier,
   getZoneRepeatModifier,
@@ -48,6 +50,15 @@ export interface HardModeContext {
   pitchHistory: PitchRecord[];
   pitchSpeed: number;
   difficulty: Difficulty;
+  fatigued?: boolean;
+}
+
+// KBO game-wide context for familiarity effects
+export interface FamiliarityContext {
+  /** How many times each pitch code has been thrown this game */
+  gamePitchCounts: Record<string, number>;
+  /** How many times this batter has already batted (0 = first time) */
+  batterTimesFaced: number;
 }
 
 // Main outcome determination
@@ -58,16 +69,18 @@ export function determinePitchOutcome(
   balls: number,
   strikes: number,
   hardModeContext?: HardModeContext,
+  familiarityCtx?: FamiliarityContext,
 ): { outcome: PitchOutcome; actualZone: Zone } {
-  const batter = BATTER_PROFILES[batterId] || DOM_BATTER_PROFILES[batterId] || USA_BATTER_PROFILES[batterId];
+  const batter = BATTER_PROFILES[batterId] || DOM_BATTER_PROFILES[batterId] || USA_BATTER_PROFILES[batterId] || CAN_BATTER_PROFILES[batterId] || KBO_BATTER_PROFILES[batterId];
   if (!batter) throw new Error(`Unknown batter: ${batterId}`);
 
   const isHard = hardModeContext?.difficulty === 'hard';
+  const isFatigued = hardModeContext?.fatigued ?? false;
 
-  // Step 0 (Hard mode): Apply location variance
+  // Step 0: Apply location variance (hard mode or fatigued pitcher)
   let actualZone = zone;
-  if (isHard) {
-    const variance = applyLocationVariance(zone);
+  if (isHard || isFatigued) {
+    const variance = applyLocationVariance(zone, isFatigued);
     actualZone = variance.actualZone;
   }
 
@@ -94,6 +107,31 @@ export function determinePitchOutcome(
     velSlgMod = velMod.slgMod;
   }
 
+  // Familiarity modifiers (apply in all modes for KBO)
+  let familiarityBaMod = 0;    // additive BA bonus
+  let familiarityWhiffMod = 1; // multiplicative whiff reduction
+
+  if (familiarityCtx) {
+    // Pitch type familiarity: more usage → batter reads it better
+    const pitchUseCount = familiarityCtx.gamePitchCounts[pitchCode] ?? 0;
+    if (pitchUseCount >= 10) {
+      familiarityBaMod += 0.030;
+      familiarityWhiffMod *= 0.85;
+    } else if (pitchUseCount >= 5) {
+      familiarityBaMod += 0.020;
+      familiarityWhiffMod *= 0.90;
+    } else if (pitchUseCount >= 2) {
+      familiarityBaMod += 0.010;
+      familiarityWhiffMod *= 0.95;
+    }
+
+    // Lineup cycle bonus: +0.050 BA per additional time faced
+    const timesFaced = familiarityCtx.batterTimesFaced;
+    if (timesFaced > 0) {
+      familiarityBaMod += 0.050 * timesFaced;
+    }
+  }
+
   // Step 1: Does the batter swing?
   let swingProb: number;
   if (inZone) {
@@ -116,9 +154,11 @@ export function determinePitchOutcome(
   // Apply hard mode: zone repeat reduces whiff, pitch repeat affects overall
   let whiffProb = inZone ? combinedWhiff : combinedWhiff * 1.3;
   if (isHard) {
-    whiffProb *= zoneRepeatWhiff;      // zone repeat → less whiff
-    whiffProb *= (1 / pitchRepeatMod); // pitch repeat batter advantage → less whiff
+    whiffProb *= zoneRepeatWhiff;
+    whiffProb *= (1 / pitchRepeatMod);
   }
+  // Familiarity: batter reads pitch better → fewer whiffs
+  whiffProb *= familiarityWhiffMod;
 
   if (Math.random() < whiffProb) {
     return { outcome: 'swinging_strike', actualZone };
@@ -141,7 +181,7 @@ export function determinePitchOutcome(
   // Step 5: Ball in play → determine hit quality
   const wOBA = zoneStats.wOBA;
   const hrRate = zoneStats.hrRate;
-  let ba = pitchStats.ba;
+  let ba = pitchStats.ba + familiarityBaMod; // apply familiarity BA boost
 
   // Hard mode: apply velocity band + pitch repeat modifiers to BA
   if (isHard) {

@@ -5,3 +5,8 @@ dist
 .omc
 scripts/cache/
 scripts/__pycache__/
+scripts/*.mp3
+scripts/*.wav
+scripts/*.png
+scripts/*.xlsx
+scripts/*.csv

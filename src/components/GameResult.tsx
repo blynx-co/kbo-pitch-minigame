@@ -8,7 +8,8 @@ import { BATTER_PROFILES } from '../data/batterProfiles';
 import { DOM_BATTER_PROFILES } from '../data/domBatterProfiles';
 import { USA_BATTER_PROFILES } from '../data/usaBatterProfiles';
 import { CAN_BATTER_PROFILES } from '../data/canBatterProfiles';
-import { USA_MAX_SCORE, CAN_MAX_SCORE } from '../utils/scoring';
+import { KBO_BATTER_PROFILES } from '../data/kboBatterProfiles';
+import { USA_MAX_SCORE, CAN_MAX_SCORE, KBO_MAX_SCORE } from '../utils/scoring';
 import type { ScenarioMode, ScenarioAtBat } from '../data/lorenzenScenarios';
 
 interface GameResultProps {
@@ -21,6 +22,11 @@ interface GameResultProps {
   leadScore?: LeadScoreResult;
   scenarioMode?: ScenarioMode;
   selectedAtBats?: ScenarioAtBat[];
+  // KBO 9-inning
+  kboHanwhaScore?: number;
+  kboKiaScore?: number;
+  kboHanwhaInningScores?: number[];
+  kboKiaInningScores?: number[];
 }
 
 function pitchEmoji(outcome: PitchOutcome): string {
@@ -53,13 +59,14 @@ function gradeColor(grade: string): string {
   }
 }
 
-export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName, leadScore, scenarioMode, selectedAtBats }: GameResultProps) {
+export default function GameResult({ atBats, totalScore, difficulty, onRestart, gameMode, pitcherName, leadScore, scenarioMode, selectedAtBats, kboHanwhaScore, kboKiaScore, kboHanwhaInningScores, kboKiaInningScores }: GameResultProps) {
   const { t, lang, playerName } = useLanguage();
   const [copied, setCopied] = useState(false);
-  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES, ...CAN_BATTER_PROFILES };
+  const allProfiles = { ...BATTER_PROFILES, ...DOM_BATTER_PROFILES, ...USA_BATTER_PROFILES, ...CAN_BATTER_PROFILES, ...KBO_BATTER_PROFILES };
   const maxScore = gameMode === 'scenario' ? SCENARIO_MAX_SCORE
     : gameMode === 'usa' ? USA_MAX_SCORE
     : gameMode === 'can' ? CAN_MAX_SCORE
+    : gameMode === 'kbo' ? (atBats.length * 200) || KBO_MAX_SCORE
     : gameMode === 'dom' ? DOM_MAX_SCORE
     : JAPAN_MAX_SCORE;
   const isHard = difficulty === 'hard';
@@ -112,13 +119,21 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
 
   const resultTitle = gameMode === 'scenario'
     ? (lang === 'ko' ? scenarioMode?.nameKo : scenarioMode?.name) ?? t('result.scenarioTitle')
+    : gameMode === 'kbo' ? (lang === 'ko' ? '한화 vs KIA' : 'Hanwha vs KIA')
     : gameMode === 'usa' ? t('result.usaTitle')
     : gameMode === 'can' ? t('result.canTitle')
     : gameMode === 'dom' ? t('result.domTitle')
     : t('result.japanTitle');
 
+  const kboWin = gameMode === 'kbo' && kboHanwhaScore !== undefined && kboKiaScore !== undefined
+    ? kboHanwhaScore > kboKiaScore
+    : false;
+  const kboTie = gameMode === 'kbo' && kboHanwhaScore !== undefined && kboKiaScore !== undefined
+    ? kboHanwhaScore === kboKiaScore
+    : false;
+
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8">
+    <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8 pb-[20vh]">
       <div className="max-w-md w-full">
         {/* Title */}
         <h2 className="text-center text-lg text-slate-400 mb-1">
@@ -133,6 +148,55 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
           </p>
           <p className="text-slate-300 font-medium text-lg">{t('grade.' + grade)}</p>
         </div>
+
+        {/* KBO Result Image */}
+        {gameMode === 'kbo' && (
+          <div className="mb-4">
+            <img
+              src={kboWin ? '/images/eagles-win.png' : kboTie ? '/images/tie.png' : '/images/tigers-win.png'}
+              alt={kboWin ? 'Hanwha Eagles Win' : kboTie ? 'Tie Game' : 'KIA Tigers Win'}
+              className="w-full max-w-sm mx-auto rounded-xl shadow-lg"
+            />
+          </div>
+        )}
+
+        {/* KBO Scoreboard */}
+        {gameMode === 'kbo' && kboHanwhaInningScores && kboKiaInningScores && (
+          <div className="bg-slate-800/80 rounded-xl border border-slate-700 p-3 mb-4 overflow-x-auto">
+            <div className="text-center mb-2">
+              <span className={`text-3xl font-black ${kboWin ? 'text-blue-400' : kboTie ? 'text-white' : 'text-red-400'}`}>
+                {kboWin ? (lang === 'ko' ? '승리!' : 'WIN!') : kboTie ? (lang === 'ko' ? '무승부' : 'TIE') : (lang === 'ko' ? '패배' : 'LOSS')}
+              </span>
+            </div>
+            <table className="w-full text-center text-xs">
+              <thead>
+                <tr>
+                  <th className="text-slate-400 px-1 py-0.5 text-left"></th>
+                  {Array.from({ length: 9 }, (_, i) => (
+                    <th key={i} className="text-slate-400 px-1 py-0.5 font-mono">{i + 1}</th>
+                  ))}
+                  <th className="text-white font-bold px-2 py-0.5 border-l border-slate-600">R</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="text-left px-1 py-0.5 text-white font-semibold">🦅</td>
+                  {kboHanwhaInningScores.map((s, i) => (
+                    <td key={i} className="px-1 py-0.5 font-mono text-white">{s}</td>
+                  ))}
+                  <td className="px-2 py-0.5 font-mono font-bold text-white border-l border-slate-600">{kboHanwhaScore}</td>
+                </tr>
+                <tr>
+                  <td className="text-left px-1 py-0.5 text-white font-semibold">🐯</td>
+                  {kboKiaInningScores.map((s, i) => (
+                    <td key={i} className="px-1 py-0.5 font-mono text-white">{s}</td>
+                  ))}
+                  <td className="px-2 py-0.5 font-mono font-bold text-white border-l border-slate-600">{kboKiaScore}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
 
         {/* Score */}
         <div className="text-center mb-6">
