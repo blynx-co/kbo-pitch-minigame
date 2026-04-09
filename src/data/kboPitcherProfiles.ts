@@ -83,8 +83,8 @@ export const KBO_PITCHERS: KorPitcherProfile[] = [
     name: 'Seo-Hyun Kim',
     nameKo: '김서현',
     hand: 'R',
-    style: '화력 불펜',
-    description: '154km/h 강속구에 슬라이더·체인지업. 짧은 이닝 화력 투입.',
+    style: '마무리',
+    description: '154km/h 강속구에 슬라이더·체인지업. 9회를 책임진다.',
     pitchLimit: 20,
     pitches: [
       { code: 'FF', name: 'Four-Seam', nameKo: '포심', avgSpeed: 96, movement: '직선 궤도' },
@@ -125,8 +125,8 @@ export const KBO_PITCHERS: KorPitcherProfile[] = [
     name: 'San-Heum Yoon',
     nameKo: '윤산흠',
     hand: 'R',
-    style: '마무리',
-    description: '148km/h 포심에 커브·슬라이더. 9회를 책임진다.',
+    style: '셋업',
+    description: '148km/h 포심에 커브·슬라이더. 8회를 책임진다.',
     pitchLimit: 20,
     pitches: [
       { code: 'FF', name: 'Four-Seam', nameKo: '포심', avgSpeed: 92, movement: '직선 궤도' },
