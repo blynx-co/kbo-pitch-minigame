@@ -122,7 +122,8 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
       timing = 'early';
     } else {
       const elapsed = (Date.now() - pitchStartTime.current) / 1000;
-      const ratio = elapsed / (plateTime.current * 2.5);
+      const animDuration = plateTime.current * (1 / 0.8); // must match BatterViewScene
+      const ratio = elapsed / animDuration;
       timing = getTimingQuality(ratio);
     }
 

@@ -50,14 +50,17 @@ export function applySwingError(targetZone: Zone): Zone {
 }
 
 /**
- * Timing quality from click ratio (0 = pitch start, 1 = ball arrival)
+ * Timing quality from click ratio (0 = pitch released, 1 = ball arrives at zone)
+ * Perfect = swing when ball is almost at the zone (0.75-0.95)
+ * Good = slightly early or late (0.55-0.75 or 0.95-1.1)
+ * Early/Late = clearly mistimed
  */
 export function getTimingQuality(clickRatio: number): TimingQuality {
-  if (clickRatio >= 0.65 && clickRatio <= 0.85) return 'perfect';
-  if (clickRatio >= 0.50 && clickRatio <= 0.92) return 'good';
-  if (clickRatio < 0.35) return 'way_off';
-  if (clickRatio < 0.50) return 'early';
-  return 'late'; // > 0.92
+  if (clickRatio >= 0.75 && clickRatio <= 0.95) return 'perfect';
+  if (clickRatio >= 0.55 && clickRatio <= 1.10) return 'good';
+  if (clickRatio < 0.30) return 'way_off';
+  if (clickRatio < 0.55) return 'early';
+  return 'late'; // > 1.10
 }
 
 /**
@@ -67,7 +70,7 @@ export function determineBattingOutcome(
   action: 'swing' | 'take',
   playerSwingZone: Zone | null,
   actualPitchZone: Zone,
-  pitchCode: string,
+  _pitchCode: string,
   timing: TimingQuality,
   strikes: number = 0,
 ): BattingResult {
@@ -89,7 +92,6 @@ export function determineBattingOutcome(
   const adjacent = ZONE_ADJACENCY[actualPitchZone]?.includes(actualSwingZone) ?? false;
 
   const zoneStats = batter.zones[actualPitchZone];
-  const pitchStats = batter.pitchTypeStats[pitchCode] ?? { ba: 0.200, whiffRate: 0.35 };
   const hrRate = zoneStats.hrRate;
 
   // Helper: on 2 strikes, convert some whiffs to fouls (foul protection)
