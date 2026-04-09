@@ -10,6 +10,8 @@ interface PitchBallProps {
   isAnimating: boolean;
   onAnimationComplete: () => void;
   animationSpeed?: number;
+  ballScale?: number;    // extra scale multiplier (default 1)
+  glowIntensity?: number; // emissive intensity (default 0.03)
 }
 
 export default function PitchBall({
@@ -17,6 +19,8 @@ export default function PitchBall({
   isAnimating,
   onAnimationComplete,
   animationSpeed = 1,
+  ballScale = 1,
+  glowIntensity = 0.03,
 }: PitchBallProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const matRef = useRef<THREE.MeshStandardMaterial>(null);
@@ -37,7 +41,7 @@ export default function PitchBall({
       meshRef.current.rotation.set(0, 0, 0);
     }
     if (matRef.current) {
-      matRef.current.emissiveIntensity = 0.03;
+      matRef.current.emissiveIntensity = glowIntensity;
     }
   }, [pitch]);
 
@@ -81,7 +85,7 @@ export default function PitchBall({
 
     const zNorm = THREE.MathUtils.clamp((pos.z + 55) / 55, 0, 1);
     const looming = Math.pow(zNorm, 2.5);
-    const baseScale = 0.5 + looming * 1.5;
+    const baseScale = (0.5 + looming * 1.5) * ballScale;
 
     const currentPos = pos;
     const velocity = currentPos.clone().sub(prevPosRef.current);
@@ -100,15 +104,15 @@ export default function PitchBall({
 
   return (
     <group>
-      <mesh ref={meshRef} position={isAnimating ? undefined : startPos} scale={0.6}>
+      <mesh ref={meshRef} position={isAnimating ? undefined : startPos} scale={0.6 * ballScale}>
         <sphereGeometry args={[0.121, 16, 16]} />
         <meshStandardMaterial
           ref={matRef}
           color="#ffffff"
-          roughness={0.4}
+          roughness={0.3}
           metalness={0.1}
           emissive={color}
-          emissiveIntensity={0.03}
+          emissiveIntensity={glowIntensity}
         />
       </mesh>
     </group>
