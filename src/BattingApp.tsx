@@ -233,20 +233,6 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     </div>
   );
 
-  const ZoneGrid = ({ onSelect }: { onSelect: (z: Zone) => void }) => (
-    <div className="grid grid-cols-3 gap-1.5 w-40 h-40 sm:w-48 sm:h-48">
-      {([1, 2, 3, 4, 5, 6, 7, 8, 9] as Zone[]).map(z => (
-        <button
-          key={z}
-          onClick={() => onSelect(z)}
-          className="rounded-lg border-2 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/30 active:bg-amber-500/60 active:scale-90 transition-all text-amber-500/30 text-xs font-mono"
-        >
-          {z}
-        </button>
-      ))}
-    </div>
-  );
-
   // ===== RENDER =====
 
   if (phase === 'intro') {
@@ -302,14 +288,14 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     );
   }
 
-  // --- Windup + Pitch flying (combined view with zone grid) ---
+  // --- Windup + Pitch flying (full-screen 3D with zone overlay) ---
   if ((phase === 'windup' || phase === 'pitch_flying') && trajectory) {
     return (
-      <div className="min-h-[calc(100vh-22vh)] bg-slate-950 flex flex-col items-center justify-center relative">
+      <div className="fixed inset-0 bg-slate-950">
         <HUD />
 
-        {/* 3D batter view — only animate when ball is launched */}
-        <div className="w-full h-[35vh] sm:h-[40vh]">
+        {/* Full-screen 3D batter view */}
+        <div className="w-full h-full">
           <BatterViewScene
             pitch={trajectory}
             isAnimating={ballLaunched}
@@ -317,28 +303,43 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
           />
         </div>
 
-        {/* Status indicator */}
-        <div className="mt-2 mb-2 h-6">
-          {phase === 'windup' ? (
-            <p className="text-amber-400 text-sm font-bold animate-pulse">
-              야마모토 와인드업... 스윙 존을 정하세요!
-            </p>
-          ) : (
-            <p className="text-red-400 text-sm font-black animate-pulse">
-              공이 온다! 지금 스윙!
-            </p>
-          )}
+        {/* Zone grid overlay — positioned over the 3D strike zone */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" style={{ paddingBottom: '8vh' }}>
+          <div className="pointer-events-auto">
+            <div className="grid grid-cols-3 gap-0.5 w-28 h-28 sm:w-36 sm:h-36">
+              {([1, 2, 3, 4, 5, 6, 7, 8, 9] as Zone[]).map(z => (
+                <button
+                  key={z}
+                  onClick={() => handleSwing(z)}
+                  className="rounded border border-amber-400/30 bg-amber-500/5 hover:bg-amber-500/25 active:bg-amber-500/50 active:scale-90 transition-all text-amber-400/20 text-[10px] font-mono backdrop-blur-[1px]"
+                >
+                  {z}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
-        {/* Zone grid — always visible during windup + pitch */}
-        <ZoneGrid onSelect={handleSwing} />
-
-        <button
-          onClick={handleAnimationEnd}
-          className="mt-3 px-4 py-1.5 text-slate-500 text-xs border border-slate-700 rounded-lg hover:text-slate-300"
-        >
-          보내기 (Take)
-        </button>
+        {/* Status + Take button at bottom */}
+        <div className="absolute bottom-[18vh] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none">
+          <div className="pointer-events-none">
+            {phase === 'windup' ? (
+              <p className="text-amber-400 text-sm font-bold animate-pulse drop-shadow-lg">
+                와인드업... 스윙 존을 정하세요!
+              </p>
+            ) : (
+              <p className="text-red-400 text-sm font-black animate-pulse drop-shadow-lg">
+                공이 온다! 지금 스윙!
+              </p>
+            )}
+          </div>
+          <button
+            onClick={handleAnimationEnd}
+            className="pointer-events-auto px-4 py-1.5 text-slate-400 text-xs border border-slate-600 rounded-lg hover:text-white bg-slate-900/60 backdrop-blur"
+          >
+            보내기 (Take)
+          </button>
+        </div>
       </div>
     );
   }
