@@ -11,9 +11,9 @@ import BatterViewScene from './components/BatterViewScene';
 type BattingPhase =
   | 'intro'
   | 'waiting'        // waiting for player to be ready
-  | 'windup'         // Yamamoto winds up (1.5s delay)
-  | 'pitch_flying'   // ball in the air — tap zone to swing
-  | 'outcome'        // show result (2s before button appears)
+  | 'windup'         // Yamamoto winds up (3s) — zone grid visible, player can prepare
+  | 'pitch_flying'   // ball in the air — zone grid still visible
+  | 'outcome'        // show result
   | 'at_bat_result'  // at-bat summary
   | 'game_result';
 
@@ -37,12 +37,13 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
   const [trajectory, setTrajectory] = useState<ReturnType<typeof generatePitchTrajectory> | null>(null);
   const [lastResult, setLastResult] = useState<BattingResult | null>(null);
   const [showNextBtn, setShowNextBtn] = useState(false);
+  const [ballLaunched, setBallLaunched] = useState(false);
 
   const pitchStartTime = useRef(0);
   const plateTime = useRef(0.5);
   const [soundStarted, setSoundStarted] = useState(false);
 
-  // Delayed show for "next" button in outcome phase
+  // Delayed "next" button in outcome
   useEffect(() => {
     if (phase === 'outcome') {
       setShowNextBtn(false);
@@ -51,27 +52,30 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     }
   }, [phase]);
 
-  // Windup auto-advance
+  // Windup → after 3s, launch ball (but keep zone grid visible)
   useEffect(() => {
     if (phase === 'windup') {
-      const timer = setTimeout(() => {
-        // Now actually launch the pitch
-        const pitch = yamamotoSelectPitch(balls, strikes);
-        setCurrentPitch(pitch);
+      // Pre-select pitch during windup (hidden from player)
+      const pitch = yamamotoSelectPitch(balls, strikes);
+      setCurrentPitch(pitch);
+      setBallLaunched(false);
 
-        const traj = generatePitchTrajectory(
-          pitch.pitchCode,
-          pitch.zone,
-          YAMAMOTO_PROFILE.pitches.find(p => p.code === pitch.pitchCode)?.avgSpeed ?? 95,
-          'R',
-          'L',
-        );
-        setTrajectory(traj);
-        plateTime.current = traj.plateTime;
+      const traj = generatePitchTrajectory(
+        pitch.pitchCode,
+        pitch.zone,
+        YAMAMOTO_PROFILE.pitches.find(p => p.code === pitch.pitchCode)?.avgSpeed ?? 95,
+        'R', 'L',
+      );
+      setTrajectory(traj);
+      plateTime.current = traj.plateTime;
+      setPitchesThisAB(prev => prev + 1);
+
+      // After 3 seconds, launch the ball
+      const timer = setTimeout(() => {
         pitchStartTime.current = Date.now();
-        setPitchesThisAB(prev => prev + 1);
+        setBallLaunched(true);
         setPhase('pitch_flying');
-      }, 1500);
+      }, 3000);
       return () => clearTimeout(timer);
     }
   }, [phase, balls, strikes]);
@@ -89,24 +93,31 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     setPhase('waiting');
   }, [startSound]);
 
-  // Player clicks "준비 완료" → windup phase
   const handleReady = useCallback(() => {
     setLastResult(null);
     setPhase('windup');
   }, []);
 
-  // Player swings at a zone
+  // Player swings — works in both windup and pitch_flying phases
   const handleSwing = useCallback((zone: Zone) => {
-    if (phase !== 'pitch_flying' || !currentPitch) return;
+    if (!currentPitch) return;
+    if (phase !== 'windup' && phase !== 'pitch_flying') return;
 
-    const elapsed = (Date.now() - pitchStartTime.current) / 1000;
-    const ratio = elapsed / (plateTime.current * 2.5);
-    const timing = getTimingQuality(ratio);
+    let timing: ReturnType<typeof getTimingQuality>;
+    if (!ballLaunched) {
+      // Swung during windup = too early
+      timing = 'early';
+    } else {
+      const elapsed = (Date.now() - pitchStartTime.current) / 1000;
+      const ratio = elapsed / (plateTime.current * 2.5);
+      timing = getTimingQuality(ratio);
+    }
+
     const result = determineBattingOutcome('swing', zone, currentPitch.zone, currentPitch.pitchCode, timing);
     setLastResult(result);
     gameAudio.onPitchOutcome(result.outcome);
     setPhase('outcome');
-  }, [phase, currentPitch]);
+  }, [phase, currentPitch, ballLaunched]);
 
   // Ball arrives without swing → take
   const handleAnimationEnd = useCallback(() => {
@@ -116,7 +127,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     setPhase('outcome');
   }, [phase, currentPitch]);
 
-  // Process outcome → update count or end at-bat
+  // Process outcome
   const handleOutcomeNext = useCallback(() => {
     if (!lastResult) return;
     const outcome = lastResult.outcome;
@@ -154,9 +165,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
         setHomerunCount(prev => prev + 1);
         newAtBatsLeft += 2;
       }
-      if (abResult === 'hit' || abResult === 'homerun') {
-        setHitCount(prev => prev + 1);
-      }
+      if (abResult === 'hit' || abResult === 'homerun') setHitCount(prev => prev + 1);
       setAtBatsLeft(newAtBatsLeft);
 
       if (newAtBatsLeft <= 0) {
@@ -174,13 +183,10 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
   }, [lastResult, balls, strikes, atBatsLeft, records, pitchesThisAB, homerunCount]);
 
   const handleNextAtBat = useCallback(() => {
-    setBalls(0);
-    setStrikes(0);
-    setPitchesThisAB(0);
+    setBalls(0); setStrikes(0); setPitchesThisAB(0);
     setCurrentAtBat(prev => prev + 1);
-    setCurrentPitch(null);
-    setTrajectory(null);
-    setLastResult(null);
+    setCurrentPitch(null); setTrajectory(null);
+    setLastResult(null); setBallLaunched(false);
     setPhase('waiting');
   }, []);
 
@@ -189,11 +195,11 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     setBalls(0); setStrikes(0); setAtBatsLeft(5); setCurrentAtBat(1);
     setPitchesThisAB(0); setHomerunCount(0); setHitCount(0);
     setRecords([]); setCurrentPitch(null); setTrajectory(null);
-    setLastResult(null); setSoundStarted(false);
+    setLastResult(null); setSoundStarted(false); setBallLaunched(false);
     setPhase('intro');
   }, []);
 
-  // === Reusable components ===
+  // === Reusable ===
   const CountDots = ({ label, count, max, color }: { label: string; count: number; max: number; color: string }) => (
     <div className="flex items-center gap-1">
       <span className="text-[10px] text-slate-400 font-mono w-3">{label}</span>
@@ -222,19 +228,16 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     </div>
   );
 
-  const ZoneGrid = ({ onSelect, disabled }: { onSelect: (z: Zone) => void; disabled: boolean }) => (
-    <div className="grid grid-cols-3 gap-1 w-36 h-36 sm:w-44 sm:h-44">
+  const ZoneGrid = ({ onSelect }: { onSelect: (z: Zone) => void }) => (
+    <div className="grid grid-cols-3 gap-1.5 w-40 h-40 sm:w-48 sm:h-48">
       {([1, 2, 3, 4, 5, 6, 7, 8, 9] as Zone[]).map(z => (
         <button
           key={z}
-          disabled={disabled}
           onClick={() => onSelect(z)}
-          className={`rounded border transition-all ${
-            disabled
-              ? 'border-slate-700 bg-slate-800/30'
-              : 'border-amber-500/50 bg-amber-500/10 hover:bg-amber-500/30 active:bg-amber-500/50 active:scale-95'
-          }`}
-        />
+          className="rounded-lg border-2 border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/30 active:bg-amber-500/60 active:scale-90 transition-all text-amber-500/30 text-xs font-mono"
+        >
+          {z}
+        </button>
       ))}
     </div>
   );
@@ -264,7 +267,8 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
           <p className="text-slate-300 mb-2">• 기본 <span className="text-amber-400 font-bold">5타석</span></p>
           <p className="text-slate-300 mb-2">• 볼넷 → 기회 <span className="text-green-400">+1</span></p>
           <p className="text-slate-300 mb-2">• 안타 → 기회 <span className="text-green-400">+2</span></p>
-          <p className="text-slate-300">• 공이 날아오면 <span className="text-amber-400 font-bold">존을 탭</span>하여 스윙!</p>
+          <p className="text-slate-300 mb-1">• 야마모토가 와인드업하는 동안 <span className="text-amber-400 font-bold">스윙할 존을 선택</span></p>
+          <p className="text-slate-300">• 공이 날아오면 <span className="text-amber-400 font-bold">타이밍에 맞춰 탭!</span></p>
         </div>
         <button
           onClick={handleStart}
@@ -277,6 +281,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     );
   }
 
+  // --- Waiting ---
   if (phase === 'waiting') {
     return (
       <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 text-center">
@@ -292,46 +297,48 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     );
   }
 
-  if (phase === 'windup') {
-    return (
-      <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 text-center">
-        <HUD />
-        <div className="text-5xl mb-4 animate-bounce">⚾</div>
-        <p className="text-white text-xl font-black animate-pulse">야마모토 투구!</p>
-        <p className="text-slate-400 text-sm mt-2">집중하세요...</p>
-      </div>
-    );
-  }
-
-  if (phase === 'pitch_flying' && trajectory) {
+  // --- Windup + Pitch flying (combined view with zone grid) ---
+  if ((phase === 'windup' || phase === 'pitch_flying') && trajectory) {
     return (
       <div className="min-h-[calc(100vh-22vh)] bg-slate-950 flex flex-col items-center justify-center relative">
         <HUD />
 
-        {/* Batter's eye 3D view */}
-        <div className="w-full h-[40vh] sm:h-[45vh]">
+        {/* 3D batter view — only animate when ball is launched */}
+        <div className="w-full h-[35vh] sm:h-[40vh]">
           <BatterViewScene
             pitch={trajectory}
-            isAnimating={true}
+            isAnimating={ballLaunched}
             onAnimationComplete={handleAnimationEnd}
           />
         </div>
 
-        {/* Strike zone — tap to swing */}
-        <div className="flex flex-col items-center mt-2">
-          <p className="text-amber-400 text-xs font-bold mb-2 animate-pulse">↓ 스윙할 존을 탭! ↓</p>
-          <ZoneGrid onSelect={handleSwing} disabled={false} />
-          <button
-            onClick={handleAnimationEnd}
-            className="mt-3 px-4 py-1.5 text-slate-500 text-xs border border-slate-700 rounded-lg hover:text-slate-300"
-          >
-            보내기 (Take)
-          </button>
+        {/* Status indicator */}
+        <div className="mt-2 mb-2 h-6">
+          {phase === 'windup' ? (
+            <p className="text-amber-400 text-sm font-bold animate-pulse">
+              야마모토 와인드업... 스윙 존을 정하세요!
+            </p>
+          ) : (
+            <p className="text-red-400 text-sm font-black animate-pulse">
+              공이 온다! 지금 스윙!
+            </p>
+          )}
         </div>
+
+        {/* Zone grid — always visible during windup + pitch */}
+        <ZoneGrid onSelect={handleSwing} />
+
+        <button
+          onClick={handleAnimationEnd}
+          className="mt-3 px-4 py-1.5 text-slate-500 text-xs border border-slate-700 rounded-lg hover:text-slate-300"
+        >
+          보내기 (Take)
+        </button>
       </div>
     );
   }
 
+  // --- Outcome ---
   if (phase === 'outcome' && lastResult) {
     const isGood = ['single', 'double', 'triple', 'homerun', 'ball'].includes(lastResult.outcome);
     const isHR = lastResult.outcome === 'homerun';
@@ -347,7 +354,6 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
           {lastResult.description}
         </div>
 
-        {/* Timing */}
         {lastResult.timingQuality !== 'way_off' && (
           <div className="text-sm mb-2">
             <span className="text-slate-500">타이밍: </span>
@@ -364,13 +370,11 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
           </div>
         )}
 
-        {/* Pitch info */}
         <div className="text-slate-500 text-xs mb-6">
           야마모토: {YAMAMOTO_PROFILE.pitches.find(p => p.code === currentPitch?.pitchCode)?.nameKo ?? '?'}
           {' '}{YAMAMOTO_PROFILE.pitches.find(p => p.code === currentPitch?.pitchCode)?.avgSpeed ?? '?'}mph
         </div>
 
-        {/* Delayed next button */}
         {showNextBtn ? (
           <button
             onClick={handleOutcomeNext}
@@ -379,12 +383,13 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
             다음
           </button>
         ) : (
-          <div className="h-12" /> // placeholder while button is hidden
+          <div className="h-12" />
         )}
       </div>
     );
   }
 
+  // --- At-bat result ---
   if (phase === 'at_bat_result') {
     const lastRec = records[records.length - 1];
     const resultText = lastRec?.result === 'strikeout' ? '삼진...'
@@ -398,9 +403,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
         <div className={`text-3xl font-black mb-2 ${isPositive ? 'text-green-400' : 'text-red-400'}`}>
           {resultText}
         </div>
-        <div className="text-slate-400 text-sm mb-2">
-          {lastRec?.pitchCount}구 승부
-        </div>
+        <div className="text-slate-400 text-sm mb-2">{lastRec?.pitchCount}구 승부</div>
         <div className="bg-slate-800/60 rounded-xl border border-slate-700 p-4 mb-6 max-w-xs">
           <div className="flex justify-between text-sm">
             <span className="text-slate-400">남은 타석</span>
@@ -425,6 +428,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     );
   }
 
+  // --- Game result ---
   if (phase === 'game_result') {
     const totalHR = homerunCount;
     const grade = totalHR >= 3 ? 'S' : totalHR >= 2 ? 'A' : totalHR >= 1 ? 'B' : hitCount >= 2 ? 'C' : 'F';
@@ -432,7 +436,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     const gradeColor = grade === 'S' ? 'text-amber-400' : grade === 'A' ? 'text-blue-400' : grade === 'B' ? 'text-green-400' : grade === 'C' ? 'text-slate-300' : 'text-red-400';
 
     return (
-      <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8 text-center">
+      <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8 text-center pb-[20vh]">
         <h2 className="text-slate-400 text-lg mb-1">애국지사 노시환, 야마모토를 이겨라</h2>
         <div className={`text-7xl font-black ${gradeColor} mb-1`}>{grade}</div>
         <div className="text-slate-300 font-medium text-lg mb-6">{gradeLabel}</div>
