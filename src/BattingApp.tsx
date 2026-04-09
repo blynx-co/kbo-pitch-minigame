@@ -7,14 +7,16 @@ import { determineBattingOutcome, getTimingQuality, type BattingResult } from '.
 import { generatePitchTrajectory } from './engine/outcomeEngine';
 import { gameAudio } from './audio/gameAudio';
 import BatterViewScene from './components/BatterViewScene';
+import type { SwingEffect } from './components/BatterViewScene';
 
 type BattingPhase =
   | 'intro'
-  | 'waiting'        // waiting for player to be ready
-  | 'windup'         // Yamamoto winds up (3s) — zone grid visible, player can prepare
-  | 'pitch_flying'   // ball in the air — zone grid still visible
-  | 'outcome'        // show result
-  | 'at_bat_result'  // at-bat summary
+  | 'waiting'
+  | 'windup'
+  | 'pitch_flying'
+  | 'impact'         // brief effect animation (1s)
+  | 'outcome'
+  | 'at_bat_result'
   | 'game_result';
 
 interface AtBatRecord {
@@ -38,6 +40,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
   const [lastResult, setLastResult] = useState<BattingResult | null>(null);
   const [showNextBtn, setShowNextBtn] = useState(false);
   const [ballLaunched, setBallLaunched] = useState(false);
+  const [swingEffect, setSwingEffect] = useState<SwingEffect | null>(null);
 
   const pitchStartTime = useRef(0);
   const plateTime = useRef(0.5);
@@ -51,6 +54,19 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
       return () => clearTimeout(timer);
     }
   }, [phase]);
+
+  // Impact effect → auto-advance to outcome after delay
+  useEffect(() => {
+    if (phase === 'impact') {
+      const isHR = lastResult?.outcome === 'homerun';
+      const delay = isHR ? 1500 : 800; // HR gets longer effect
+      const timer = setTimeout(() => {
+        setSwingEffect(null);
+        setPhase('outcome');
+      }, delay);
+      return () => clearTimeout(timer);
+    }
+  }, [phase, lastResult]);
 
   // Windup → after 3s, launch ball
   useEffect(() => {
@@ -113,14 +129,16 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     const result = determineBattingOutcome('swing', zone, currentPitch.zone, currentPitch.pitchCode, timing);
     setLastResult(result);
 
-    // Swing sound: always play bat swing, then hit sound if contact
+    // Set effect for visual impact
+    setSwingEffect({ outcome: result.outcome, zone, actualZone: currentPitch.zone });
+
+    // Swing sound
     gameAudio.onPitchOutcome('swinging_strike'); // bat whoosh
     if (result.outcome !== 'swinging_strike') {
-      // Contact made — play bat crack after short delay
       setTimeout(() => gameAudio.onPitchOutcome(result.outcome), 150);
     }
 
-    setPhase('outcome');
+    setPhase('impact');
   }, [phase, currentPitch, ballLaunched]);
 
   // Ball arrives without swing → take
@@ -190,7 +208,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     setBalls(0); setStrikes(0); setPitchesThisAB(0);
     setCurrentAtBat(prev => prev + 1);
     setCurrentPitch(null); setTrajectory(null);
-    setLastResult(null); setBallLaunched(false);
+    setLastResult(null); setBallLaunched(false); setSwingEffect(null);
     setPhase('waiting');
   }, []);
 
@@ -199,7 +217,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     setBalls(0); setStrikes(0); setAtBatsLeft(5); setCurrentAtBat(1);
     setPitchesThisAB(0); setHomerunCount(0); setHitCount(0);
     setRecords([]); setCurrentPitch(null); setTrajectory(null);
-    setLastResult(null); setSoundStarted(false); setBallLaunched(false);
+    setLastResult(null); setSoundStarted(false); setBallLaunched(false); setSwingEffect(null);
     setPhase('intro');
   }, []);
 
@@ -287,8 +305,8 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     );
   }
 
-  // --- Windup + Pitch flying (catcher view, zone grid IN 3D space) ---
-  if ((phase === 'windup' || phase === 'pitch_flying') && trajectory) {
+  // --- Windup + Pitch flying + Impact ---
+  if ((phase === 'windup' || phase === 'pitch_flying' || phase === 'impact') && trajectory) {
     return (
       <div className="fixed inset-0 bg-slate-950">
         <HUD />
@@ -297,16 +315,21 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
         <div className="w-full h-full">
           <BatterViewScene
             pitch={trajectory}
-            isAnimating={ballLaunched}
+            isAnimating={ballLaunched && phase !== 'impact'}
             onAnimationComplete={handleAnimationEnd}
-            onSwing={handleSwing}
+            onSwing={phase !== 'impact' ? handleSwing : undefined}
+            effect={swingEffect}
           />
         </div>
 
         {/* Status + Take button at bottom (z-index below zone grid) */}
         <div className="absolute bottom-[18vh] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none z-[5]">
           <div>
-            {phase === 'windup' ? (
+            {phase === 'impact' ? (
+              <p className="text-white text-lg font-black drop-shadow-lg">
+                {lastResult?.description ?? ''}
+              </p>
+            ) : phase === 'windup' ? (
               <p className="text-amber-400 text-sm font-bold animate-pulse drop-shadow-lg">
                 스트라이크 존을 클릭하여 스윙!
               </p>
@@ -316,12 +339,14 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
               </p>
             )}
           </div>
-          <button
-            onClick={handleAnimationEnd}
-            className="pointer-events-auto px-4 py-1.5 text-slate-400 text-xs border border-slate-600 rounded-lg hover:text-white bg-slate-900/60 backdrop-blur"
-          >
-            보내기 (Take)
-          </button>
+          {phase !== 'impact' && (
+            <button
+              onClick={handleAnimationEnd}
+              className="pointer-events-auto px-4 py-1.5 text-slate-400 text-xs border border-slate-600 rounded-lg hover:text-white bg-slate-900/60 backdrop-blur"
+            >
+              보내기 (Take)
+            </button>
+          )}
         </div>
       </div>
     );
