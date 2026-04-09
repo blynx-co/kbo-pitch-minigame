@@ -142,23 +142,25 @@ export function determineBattingOutcome(
       return { outcome: 'swinging_strike', description: '헛스윙! 코스가 안 맞았다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
     }
 
-    // Adjacent zone = weak contact
+    // Adjacent zone = weak contact → 안타 20%
     if (!perfectMatch && adjacent) {
       const roll = Math.random();
-      if (roll < 0.25) return { outcome: 'foul', description: '파울!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-      if (roll < 0.70) return { outcome: 'groundout', description: '땅볼... 맞긴 했는데', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-      if (roll < 0.90) return { outcome: 'flyout', description: '뜬공 아웃...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-      return { outcome: 'single', description: '안타! 잘 맞진 않았지만', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      if (roll < 0.15) return { outcome: 'foul', description: '파울!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      if (roll < 0.45) return { outcome: 'groundout', description: '땅볼... 맞긴 했는데', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      if (roll < 0.65) return { outcome: 'flyout', description: '뜬공 아웃...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      if (roll < 0.90) return { outcome: 'single', description: '안타! 잘 맞진 않았지만', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      return { outcome: 'double', description: '2루타!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
     }
 
     // Perfect zone match + good timing → decent contact
+    // Target: 파울 10%, 안타류 40%, 아웃 35%, 2루타+ 15%
     const roll = Math.random();
-    const ba = pitchStats.ba;
-    if (roll < 0.15) return { outcome: 'foul', description: '파울! 아깝다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-    if (roll < 0.15 + (1 - ba) * 0.5) return { outcome: 'groundout', description: '땅볼... 타이밍이 살짝', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-    if (roll < 0.15 + (1 - ba) * 0.5 + 0.15) return { outcome: 'flyout', description: '뜬공 아웃...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-    if (roll < 0.95) return { outcome: 'single', description: '안타!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
-    return { outcome: 'double', description: '2루타! 좋은 타격!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.10) return { outcome: 'foul', description: '파울! 아깝다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.28) return { outcome: 'groundout', description: '땅볼... 타이밍이 살짝', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.45) return { outcome: 'flyout', description: '뜬공 아웃...', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.80) return { outcome: 'single', description: '안타!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.95) return { outcome: 'double', description: '2루타! 좋은 타격!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    return { outcome: 'homerun', description: '홈런!!! 타이밍 좋았다!!!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
   }
 
   // === PERFECT timing ===
