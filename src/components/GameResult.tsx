@@ -70,8 +70,23 @@ export default function GameResult({ atBats, totalScore, difficulty, onRestart, 
     : gameMode === 'dom' ? DOM_MAX_SCORE
     : JAPAN_MAX_SCORE;
   const isHard = difficulty === 'hard';
-  const { grade } = getGrade(totalScore, maxScore);
-  const pct = Math.round((totalScore / maxScore) * 100);
+
+  // KBO: grade by runs allowed, not pitch score
+  let grade: string;
+  let pct: number;
+  if (gameMode === 'kbo' && kboKiaScore !== undefined) {
+    const runsAllowed = kboKiaScore;
+    if (runsAllowed <= 2) grade = 'S';
+    else if (runsAllowed <= 4) grade = 'A';
+    else if (runsAllowed <= 6) grade = 'B';
+    else if (runsAllowed <= 8) grade = 'C';
+    else if (runsAllowed <= 10) grade = 'D';
+    else grade = 'F';
+    pct = Math.max(0, Math.round((1 - runsAllowed / 15) * 100));
+  } else {
+    ({ grade } = getGrade(totalScore, maxScore));
+    pct = Math.round((totalScore / maxScore) * 100);
+  }
 
   function outcomeLabel(outcome: AtBatOutcome): string {
     switch (outcome.type) {
