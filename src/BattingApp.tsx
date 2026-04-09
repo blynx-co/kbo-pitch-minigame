@@ -288,51 +288,28 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     );
   }
 
-  // --- Windup + Pitch flying (catcher view + zone overlay exactly on strike zone) ---
+  // --- Windup + Pitch flying (catcher view, zone grid IN 3D space) ---
   if ((phase === 'windup' || phase === 'pitch_flying') && trajectory) {
     return (
       <div className="fixed inset-0 bg-slate-950">
         <HUD />
 
-        {/* Full-screen 3D catcher view */}
+        {/* Full-screen 3D catcher view — zone grid is inside the 3D scene */}
         <div className="w-full h-full">
           <BatterViewScene
             pitch={trajectory}
             isAnimating={ballLaunched}
             onAnimationComplete={handleAnimationEnd}
+            onSwing={handleSwing}
           />
         </div>
 
-        {/*
-          Zone grid overlay — precisely over the 3D strike zone.
-          The 3D strike zone renders at screen center, slightly above midpoint.
-          These values are tuned to match the catcher camera (fov:30, pos:[0,12,-65]).
-        */}
-        <div className="absolute inset-0 pointer-events-none" style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingBottom: '12%',
-        }}>
-          <div className="pointer-events-auto relative" style={{ width: '14vw', height: '18vw', minWidth: '90px', minHeight: '115px', maxWidth: '160px', maxHeight: '205px' }}>
-            <div className="grid grid-cols-3 w-full h-full">
-              {([1, 2, 3, 4, 5, 6, 7, 8, 9] as Zone[]).map(z => (
-                <button
-                  key={z}
-                  onClick={() => handleSwing(z)}
-                  className="border border-white/20 hover:bg-amber-500/30 active:bg-amber-500/60 active:scale-90 transition-all"
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Status + Take button */}
+        {/* Status + Take button at bottom */}
         <div className="absolute bottom-[18vh] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none">
           <div>
             {phase === 'windup' ? (
               <p className="text-amber-400 text-sm font-bold animate-pulse drop-shadow-lg">
-                와인드업... 스윙 존을 클릭!
+                스트라이크 존을 클릭하여 스윙!
               </p>
             ) : (
               <p className="text-red-400 text-sm font-black animate-pulse drop-shadow-lg">
