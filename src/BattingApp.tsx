@@ -263,7 +263,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
           <div className="text-center">
             <div className="text-4xl mb-1">🇰🇷</div>
             <div className="text-white font-bold">{NOH_SIHWAN.nameKo}</div>
-            <div className="text-slate-400 text-xs">한화 / 좌타</div>
+            <div className="text-slate-400 text-xs">한화 / 우타</div>
           </div>
           <div className="text-slate-500 text-2xl font-black self-center">VS</div>
           <div className="text-center">

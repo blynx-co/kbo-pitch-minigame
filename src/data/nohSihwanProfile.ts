@@ -10,7 +10,7 @@ export const NOH_SIHWAN: BatterProfile = {
   id: 'noh-si-hwan',
   name: 'Si-Hwan Noh',
   nameKo: '노시환',
-  bats: 'L',
+  bats: 'R',
   team: 'Hanwha',
   flavorText: '한화의 4번 타자. 당겨치기 파워는 KBO 최상급이지만 MLB 급 변화구에는 약하다.',
   zones: {
