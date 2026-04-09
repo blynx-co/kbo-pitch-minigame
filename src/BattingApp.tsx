@@ -126,7 +126,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
       timing = getTimingQuality(ratio);
     }
 
-    const result = determineBattingOutcome('swing', zone, currentPitch.zone, currentPitch.pitchCode, timing);
+    const result = determineBattingOutcome('swing', zone, currentPitch.zone, currentPitch.pitchCode, timing, strikes);
     setLastResult(result);
 
     // Set effect for visual impact
@@ -146,6 +146,7 @@ export default function BattingApp({ onBack }: { onBack: () => void }) {
     if (phase !== 'pitch_flying' || !currentPitch) return;
     const result = determineBattingOutcome('take', null, currentPitch.zone, currentPitch.pitchCode, 'way_off');
     setLastResult(result);
+    setSwingEffect(null);
     setPhase('outcome');
   }, [phase, currentPitch]);
 

@@ -69,8 +69,10 @@ export function determineBattingOutcome(
   actualPitchZone: Zone,
   pitchCode: string,
   timing: TimingQuality,
+  strikes: number = 0,
 ): BattingResult {
   const batter = NOH_SIHWAN;
+  const twoStrikes = strikes >= 2;
 
   // === TAKE ===
   if (action === 'take' || !playerSwingZone) {
@@ -90,6 +92,14 @@ export function determineBattingOutcome(
   const pitchStats = batter.pitchTypeStats[pitchCode] ?? { ba: 0.200, whiffRate: 0.35 };
   const hrRate = zoneStats.hrRate;
 
+  // Helper: on 2 strikes, convert some whiffs to fouls (foul protection)
+  const foulOrWhiff = (desc: string): BattingResult => {
+    if (twoStrikes && (perfectMatch || adjacent) && Math.random() < 0.5) {
+      return { outcome: 'foul', description: '파울! 간신히 걸렸다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    }
+    return { outcome: 'swinging_strike', description: desc, timingQuality: timing, swingZoneAfterError: actualSwingZone };
+  };
+
   // === WAY OFF timing → always whiff ===
   if (timing === 'way_off') {
     return { outcome: 'swinging_strike', description: '타이밍 완전 빗나감! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
@@ -97,16 +107,14 @@ export function determineBattingOutcome(
 
   // === EARLY timing → mostly whiff, some weak groundout ===
   if (timing === 'early') {
-    // Far zone = guaranteed whiff
     if (!perfectMatch && !adjacent) {
-      return { outcome: 'swinging_strike', description: '너무 빨랐다! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      return foulOrWhiff('너무 빨랐다! 헛스윙!');
     }
-    // Matched zone but early → topped ball
     const roll = Math.random();
-    if (roll < 0.55) {
-      return { outcome: 'swinging_strike', description: '너무 빨랐다! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.40) {
+      return foulOrWhiff('너무 빨랐다! 헛스윙!');
     }
-    if (roll < 0.80) {
+    if (roll < 0.75) {
       return { outcome: 'foul', description: '파울! 살짝 걸렸다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
     }
     return { outcome: 'groundout', description: '땅볼... 타이밍이 빨랐다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
@@ -115,13 +123,13 @@ export function determineBattingOutcome(
   // === LATE timing → mostly whiff/foul, some weak groundout ===
   if (timing === 'late') {
     if (!perfectMatch && !adjacent) {
-      return { outcome: 'swinging_strike', description: '늦었다! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+      return foulOrWhiff('늦었다! 헛스윙!');
     }
     const roll = Math.random();
-    if (roll < 0.50) {
-      return { outcome: 'swinging_strike', description: '타이밍 늦었다! 헛스윙!', timingQuality: timing, swingZoneAfterError: actualSwingZone };
+    if (roll < 0.35) {
+      return foulOrWhiff('타이밍 늦었다! 헛스윙!');
     }
-    if (roll < 0.80) {
+    if (roll < 0.75) {
       return { outcome: 'foul', description: '파울! 늦게 걸렸다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
     }
     return { outcome: 'groundout', description: '땅볼... 타이밍이 늦었다', timingQuality: timing, swingZoneAfterError: actualSwingZone };
