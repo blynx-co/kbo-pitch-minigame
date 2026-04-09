@@ -1,4 +1,4 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo } from 'react';
 import * as THREE from 'three';
 
 interface BatterBoxProps {
@@ -48,144 +48,39 @@ function PitcherMound() {
   );
 }
 
-/** Strike zone wireframe box */
+/** Strike zone — bright outline + 3x3 grid lines */
 function StrikeZone({ szTop, szBot }: { szTop: number; szBot: number }) {
   const height = szTop - szBot;
   const centerY = (szTop + szBot) / 2;
   const width = 17 / 12; // 17 inches in feet
+  const hw = width / 2;
+  const hh = height / 2;
 
-  return (
-    <lineSegments position={[0, centerY, 0]}>
-      <edgesGeometry args={[new THREE.BoxGeometry(width, height, 0.01)]} />
-      <lineBasicMaterial color="#ffffff" transparent opacity={0.4} />
-    </lineSegments>
-  );
-}
-
-/** Single batter's box using primitive + THREE.Line to avoid JSX type conflicts */
-function BatterBoxLines({ xOffset, opacity }: { xOffset: number; opacity: number }) {
-  const lineRef = useRef<THREE.Line>(null);
-
-  const geometry = useMemo(() => {
-    const hw = 1.0; // half-width = 2ft total
-    const hh = 3.0; // half-height = 3ft
-    const pts = [
-      new THREE.Vector3(xOffset - hw, 0.02, -hh),
-      new THREE.Vector3(xOffset + hw, 0.02, -hh),
-      new THREE.Vector3(xOffset + hw, 0.02, hh),
-      new THREE.Vector3(xOffset - hw, 0.02, hh),
-      new THREE.Vector3(xOffset - hw, 0.02, -hh),
-    ];
+  const gridGeo = useMemo(() => {
+    const pts: THREE.Vector3[] = [];
+    // Outer rectangle
+    pts.push(new THREE.Vector3(-hw, -hh, 0), new THREE.Vector3(hw, -hh, 0));
+    pts.push(new THREE.Vector3(hw, -hh, 0), new THREE.Vector3(hw, hh, 0));
+    pts.push(new THREE.Vector3(hw, hh, 0), new THREE.Vector3(-hw, hh, 0));
+    pts.push(new THREE.Vector3(-hw, hh, 0), new THREE.Vector3(-hw, -hh, 0));
+    // Vertical grid lines (1/3, 2/3)
+    for (let i = 1; i <= 2; i++) {
+      const x = -hw + (width * i) / 3;
+      pts.push(new THREE.Vector3(x, -hh, 0), new THREE.Vector3(x, hh, 0));
+    }
+    // Horizontal grid lines (1/3, 2/3)
+    for (let i = 1; i <= 2; i++) {
+      const y = -hh + (height * i) / 3;
+      pts.push(new THREE.Vector3(-hw, y, 0), new THREE.Vector3(hw, y, 0));
+    }
     const geo = new THREE.BufferGeometry().setFromPoints(pts);
     return geo;
-  }, [xOffset]);
-
-  const material = useMemo(
-    () => new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity }),
-    [opacity]
-  );
-
-  useEffect(() => {
-    return () => {
-      geometry.dispose();
-      material.dispose();
-    };
-  }, [geometry, material]);
-
-  return <primitive ref={lineRef} object={new THREE.Line(geometry, material)} />;
-}
-
-/** Both batter's boxes - active side bright, opposite dim */
-function BothBatterBoxes({ batSide }: { batSide: 'L' | 'R' }) {
-  const rhbX = -2.0;
-  const lhbX = 2.0;
-  return (
-    <>
-      <BatterBoxLines xOffset={rhbX} opacity={batSide === 'R' ? 0.85 : 0.25} />
-      <BatterBoxLines xOffset={lhbX} opacity={batSide === 'L' ? 0.85 : 0.25} />
-    </>
-  );
-}
-
-/** Foul lines from home plate tip to 1B/3B direction */
-function FoulLines() {
-  const lines = useMemo(() => {
-    const length = 95; // slightly past bases
-    // Home plate back tip at (0, 0, -0.85)
-    const originZ = -0.85;
-    // 45-degree foul lines
-    const cos45 = Math.cos(Math.PI / 4);
-    const sin45 = Math.sin(Math.PI / 4);
-
-    // 1st base line: +X, -Z direction
-    const firstBase = [
-      new THREE.Vector3(0, 0.015, originZ),
-      new THREE.Vector3(length * cos45, 0.015, originZ - length * sin45),
-    ];
-    // 3rd base line: -X, -Z direction
-    const thirdBase = [
-      new THREE.Vector3(0, 0.015, originZ),
-      new THREE.Vector3(-length * cos45, 0.015, originZ - length * sin45),
-    ];
-
-    const geo1 = new THREE.BufferGeometry().setFromPoints(firstBase);
-    const geo3 = new THREE.BufferGeometry().setFromPoints(thirdBase);
-    const mat = new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.75 });
-
-    return { geo1, geo3, mat };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      lines.geo1.dispose();
-      lines.geo3.dispose();
-      lines.mat.dispose();
-    };
-  }, [lines]);
+  }, [hw, hh, width, height]);
 
   return (
-    <>
-      <primitive object={new THREE.Line(lines.geo1, lines.mat)} />
-      <primitive object={new THREE.Line(lines.geo3, lines.mat)} />
-    </>
-  );
-}
-
-/** Base markers at 90ft distance */
-function BaseMarkers() {
-  const cos45 = Math.cos(Math.PI / 4);
-  const sin45 = Math.sin(Math.PI / 4);
-  const dist = 90;
-  const originZ = -0.85;
-
-  // 1B position
-  const firstBasePos: [number, number, number] = [
-    dist * cos45,
-    0.02,
-    originZ - dist * sin45,
-  ];
-  // 3B position
-  const thirdBasePos: [number, number, number] = [
-    -dist * cos45,
-    0.02,
-    originZ - dist * sin45,
-  ];
-  // 2B position (center)
-  const secondBasePos: [number, number, number] = [
-    0,
-    0.02,
-    originZ - dist * Math.SQRT2,
-  ];
-
-  return (
-    <>
-      {[firstBasePos, secondBasePos, thirdBasePos].map((pos, i) => (
-        <mesh key={i} rotation={[-Math.PI / 2, Math.PI / 4, 0]} position={pos}>
-          <planeGeometry args={[1.25, 1.25]} />
-          <meshStandardMaterial color="#ffffff" roughness={0.5} transparent opacity={0.6} />
-        </mesh>
-      ))}
-    </>
+    <lineSegments position={[0, centerY, 0]} geometry={gridGeo}>
+      <lineBasicMaterial color="#fbbf24" transparent opacity={0.7} />
+    </lineSegments>
   );
 }
 
@@ -258,7 +153,8 @@ function InfieldGrass() {
   );
 }
 
-export default function BatterBox({ szTop, szBot, batSide }: BatterBoxProps) {
+export default function BatterBox({ szTop, szBot, batSide: _batSide }: BatterBoxProps) {
+  void _batSide; // kept in interface for compatibility
   return (
     <group>
       {/* Outfield grass (lowest layer) */}
@@ -279,17 +175,8 @@ export default function BatterBox({ szTop, szBot, batSide }: BatterBoxProps) {
       {/* Pitcher's mound */}
       <PitcherMound />
 
-      {/* Foul lines */}
-      <FoulLines />
-
-      {/* Base markers */}
-      <BaseMarkers />
-
       {/* Strike zone */}
       <StrikeZone szTop={szTop} szBot={szBot} />
-
-      {/* Both batter's boxes */}
-      <BothBatterBoxes batSide={batSide} />
 
       {/* Ambient light - night game feel */}
       <ambientLight intensity={0.7} color="#b0c4de" />
