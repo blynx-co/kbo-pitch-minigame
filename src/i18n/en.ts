@@ -23,7 +23,7 @@ export const en: Translations = {
   'mode.kbo.flags': '🦅 vs 🐯',
   'mode.kbo.title': 'Hanwha vs KIA',
   'mode.kbo.desc': 'Shut down KIA lineup with Hanwha pitchers',
-  'mode.kbo.meta': '9 at-bats | Choose your pitcher',
+  'mode.kbo.meta': '9 innings | Choose your pitcher',
   'mode.scenario.icon': '🎬',
   'mode.scenario.title': 'Scenario Mode',
   'mode.scenario.desc': 'Replay iconic WBC moments and beat the real pitcher',

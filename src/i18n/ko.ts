@@ -23,7 +23,7 @@ export const ko: Translations = {
   'mode.kbo.flags': '🦅 vs 🐯',
   'mode.kbo.title': '한화 vs KIA',
   'mode.kbo.desc': '한화 투수진으로 KIA 타선을 막아라',
-  'mode.kbo.meta': '9타석 | 투수 선택 가능',
+  'mode.kbo.meta': '9이닝 | 투수 선택 가능',
   'mode.scenario.icon': '🎬',
   'mode.scenario.title': '시나리오 모드',
   'mode.scenario.desc': '실제 WBC 명장면을 재현하고, 실제 투수를 이겨보세요',
