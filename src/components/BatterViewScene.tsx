@@ -3,8 +3,8 @@ import type { PitchTrajectory, Zone, PitchOutcome } from '../data/types';
 
 export type SwingEffect = {
   outcome: PitchOutcome;
-  zone: Zone;          // where player clicked
-  actualZone: Zone;    // where ball actually was
+  zone: Zone;
+  actualZone: Zone;
 };
 
 interface BatterViewSceneProps {
@@ -12,20 +12,63 @@ interface BatterViewSceneProps {
   isAnimating: boolean;
   onAnimationComplete: () => void;
   onSwing?: (zone: Zone) => void;
-  effect?: SwingEffect | null;  // show impact effect
+  effect?: SwingEffect | null;
 }
 
+/**
+ * Zone → screen position mapping.
+ * Strike zone grid: left=39%, right=61%, top=33%, bottom=57%
+ * Ball zones: clearly outside these bounds.
+ *
+ * This ensures zones 1-9 ALWAYS land inside the visual grid,
+ * and zones 11-14 ALWAYS land outside.
+ */
+const ZONE_SCREEN_POS: Record<number, { x: number; y: number }> = {
+  // Strike zone 3x3 (inside grid bounds)
+  1: { x: 42.7, y: 36 },  2: { x: 50, y: 36 },  3: { x: 57.3, y: 36 },
+  4: { x: 42.7, y: 45 },  5: { x: 50, y: 45 },  6: { x: 57.3, y: 45 },
+  7: { x: 42.7, y: 54 },  8: { x: 50, y: 54 },  9: { x: 57.3, y: 54 },
+  // Ball zones (clearly outside grid)
+  11: { x: 50, y: 26 },   // high ball
+  12: { x: 50, y: 63 },   // low ball
+  13: { x: 34, y: 45 },   // inside (left)
+  14: { x: 66, y: 45 },   // outside (right)
+};
+
+// Grid bounds (for reference)
+const GRID = { left: 39, right: 61, top: 33, bottom: 57, cx: 50, cy: 45 };
+
 export default function BatterViewScene({ pitch, isAnimating, onAnimationComplete, onSwing, effect }: BatterViewSceneProps) {
-  const [ballPos, setBallPos] = useState({ x: 50, y: 25, scale: 0.3 });
+  const [ballPos, setBallPos] = useState({ x: 50, y: 20, scale: 0.3 });
   const [ballVisible, setBallVisible] = useState(false);
   const animRef = useRef<number>(0);
   const startTime = useRef(0);
   const completedRef = useRef(false);
 
+  // Get target based on zone number (guaranteed alignment)
   const getTargetPos = useCallback(() => {
-    const x = 50 + (pitch.pX / 1.5) * 10;
-    const y = 45 - ((pitch.pZ - 2.5) / 1.5) * 10;
-    return { x, y };
+    // Find the zone from the pitch data
+    // Map pX/pZ to nearest zone, then use the fixed screen position
+    const pX = pitch.pX;
+    const pZ = pitch.pZ;
+
+    // Determine zone from coordinates
+    let col = pX < -0.25 ? 0 : pX > 0.25 ? 2 : 1; // 0=left, 1=center, 2=right
+    let row = pZ > 2.9 ? 0 : pZ < 2.1 ? 2 : 1;     // 0=top, 1=mid, 2=bottom
+    const strikeZone = row * 3 + col + 1; // 1-9
+
+    // Check if it's actually a ball (outside strike zone)
+    const isInZone = pX >= -0.85 && pX <= 0.85 && pZ >= 1.5 && pZ <= 3.5;
+
+    if (isInZone) {
+      return ZONE_SCREEN_POS[strikeZone] ?? { x: 50, y: 45 };
+    }
+
+    // Ball zone
+    if (pZ > 3.5) return ZONE_SCREEN_POS[11]; // high
+    if (pZ < 1.5) return ZONE_SCREEN_POS[12]; // low
+    if (pX < -0.85) return ZONE_SCREEN_POS[13]; // inside
+    return ZONE_SCREEN_POS[14]; // outside
   }, [pitch.pX, pitch.pZ]);
 
   useEffect(() => {
@@ -46,9 +89,10 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
       const progress = Math.min(elapsed / duration, 1);
       const eased = progress * progress;
 
-      const x = 50 + (target.x - 50) * eased;
-      const y = 18 + (target.y - 18) * eased;
-      const scale = 0.2 + eased * 1.2;
+      // Start from top-center (mound), fly to target
+      const x = GRID.cx + (target.x - GRID.cx) * eased;
+      const y = 15 + (target.y - 15) * eased;
+      const scale = 0.15 + eased * 1.3;
       setBallPos({ x, y, scale });
 
       if (progress >= 1) {
@@ -65,12 +109,13 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
     return () => cancelAnimationFrame(animRef.current);
   }, [isAnimating, pitch.plateTime, getTargetPos, onAnimationComplete]);
 
-  // Effect visuals
   const isHit = effect && ['single', 'double', 'triple', 'homerun'].includes(effect.outcome);
   const isHR = effect?.outcome === 'homerun';
   const isWhiff = effect?.outcome === 'swinging_strike';
   const isFoul = effect?.outcome === 'foul';
   const isOut = effect && ['groundout', 'flyout', 'lineout'].includes(effect.outcome);
+
+  const target = getTargetPos();
 
   return (
     <div className="relative w-full h-full overflow-hidden select-none">
@@ -83,10 +128,9 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
       />
       <div className="absolute inset-0 bg-black/20" />
 
-      {/* Screen shake on homerun */}
       {isHR && <div className="absolute inset-0 animate-pulse bg-red-500/10 z-30" />}
 
-      {/* Animated ball (hidden during effect) */}
+      {/* Animated ball */}
       {ballVisible && !effect && (
         <div
           className="absolute rounded-full pointer-events-none"
@@ -104,90 +148,66 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
       )}
 
       {/* === IMPACT EFFECTS === */}
-      {effect && (() => {
-        const target = getTargetPos();
-        return (
-          <>
-            {/* Homerun — explosion burst */}
-            {isHR && (
-              <div
-                className="absolute pointer-events-none z-30 animate-ping"
-                style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}
-              >
-                <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full bg-gradient-radial from-yellow-300 via-orange-500 to-transparent opacity-80"
+      {effect && (
+        <>
+          {isHR && (
+            <>
+              <div className="absolute pointer-events-none z-30 animate-ping"
+                style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}>
+                <div className="w-20 h-20 sm:w-28 sm:h-28 rounded-full"
                   style={{ background: 'radial-gradient(circle, #fbbf24, #f97316, transparent)' }} />
               </div>
-            )}
-            {isHR && (
               <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
                 <span className="text-6xl sm:text-8xl animate-bounce">💥</span>
               </div>
-            )}
-
-            {/* Hit (single/double/triple) — bat crack flash */}
-            {isHit && !isHR && (
-              <>
-                <div
-                  className="absolute pointer-events-none z-30"
-                  style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}
-                >
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full animate-ping"
-                    style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.8), transparent)' }} />
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
-                  <span className="text-5xl sm:text-6xl animate-bounce">⚡</span>
-                </div>
-              </>
-            )}
-
-            {/* Whiff — swing line + miss */}
-            {isWhiff && (
+            </>
+          )}
+          {isHit && !isHR && (
+            <>
+              <div className="absolute pointer-events-none z-30"
+                style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}>
+                <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full animate-ping"
+                  style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.8), transparent)' }} />
+              </div>
               <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
-                <div className="relative">
-                  {/* Swing arc */}
-                  <div className="w-32 h-1 bg-gradient-to-r from-transparent via-white/60 to-transparent rounded-full rotate-[-20deg] animate-pulse" />
-                  <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-4xl">💨</span>
-                </div>
+                <span className="text-5xl sm:text-6xl animate-bounce">⚡</span>
               </div>
-            )}
-
-            {/* Foul — glancing spark */}
-            {isFoul && (
-              <div
-                className="absolute pointer-events-none z-30"
-                style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}
-              >
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full animate-ping"
-                  style={{ background: 'radial-gradient(circle, rgba(255,200,50,0.6), transparent)' }} />
+            </>
+          )}
+          {isWhiff && (
+            <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+              <div className="relative">
+                <div className="w-32 h-1 bg-gradient-to-r from-transparent via-white/60 to-transparent rounded-full rotate-[-20deg] animate-pulse" />
+                <span className="absolute -top-8 left-1/2 -translate-x-1/2 text-4xl">💨</span>
               </div>
-            )}
-
-            {/* Out — dull thud */}
-            {isOut && (
-              <div
-                className="absolute pointer-events-none z-30"
-                style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}
-              >
-                <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full animate-ping opacity-50"
-                  style={{ background: 'radial-gradient(circle, rgba(200,200,200,0.5), transparent)' }} />
-              </div>
-            )}
-          </>
-        );
-      })()}
+            </div>
+          )}
+          {isFoul && (
+            <div className="absolute pointer-events-none z-30"
+              style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}>
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full animate-ping"
+                style={{ background: 'radial-gradient(circle, rgba(255,200,50,0.6), transparent)' }} />
+            </div>
+          )}
+          {isOut && (
+            <div className="absolute pointer-events-none z-30"
+              style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}>
+              <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full animate-ping opacity-50"
+                style={{ background: 'radial-gradient(circle, rgba(200,200,200,0.5), transparent)' }} />
+            </div>
+          )}
+        </>
+      )}
 
       {/* Strike zone — 3x3 clickable grid (hidden during effect) */}
       {!effect && (
         <div
           className="absolute"
           style={{
-            left: '50%',
-            top: '45%',
-            transform: 'translate(-50%, -50%)',
-            width: '22%',
-            maxWidth: '200px',
-            minWidth: '120px',
-            aspectRatio: '3 / 4',
+            left: `${GRID.left}%`,
+            top: `${GRID.top}%`,
+            width: `${GRID.right - GRID.left}%`,
+            height: `${GRID.bottom - GRID.top}%`,
             zIndex: 10,
           }}
         >
