@@ -38,6 +38,7 @@ export function scorePitch(outcome: PitchOutcome, zone: Zone): number {
     case 'double': return 10;
     case 'triple': return 5;
     case 'homerun': return 0;
+    case 'hit_by_pitch': return 20;
   }
 }
 
@@ -192,6 +193,7 @@ function pitchEmoji(outcome: PitchOutcome): string {
     case 'double':
     case 'triple':
     case 'homerun':
+    case 'hit_by_pitch':
       return '\uD83D\uDD34'; // red circle
   }
 }

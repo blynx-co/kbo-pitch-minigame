@@ -26,6 +26,7 @@ function pitchEmoji(outcome: PitchOutcome): string {
     case 'double':
     case 'triple':
     case 'homerun':
+    case 'hit_by_pitch':
       return '\uD83D\uDD34'; // red circle
   }
 }

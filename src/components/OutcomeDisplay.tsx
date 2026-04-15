@@ -37,6 +37,8 @@ function getOutcomeStyle(outcome: PitchOutcome, t: (key: string) => string): { b
       return { bg: 'bg-green-900/80', text: 'text-green-400', label: t('outcome.flyout'), desc: t('outcome.flyout.desc') };
     case 'lineout':
       return { bg: 'bg-green-900/80', text: 'text-green-300', label: t('outcome.lineout'), desc: t('outcome.lineout.desc') };
+    case 'hit_by_pitch':
+      return { bg: 'bg-yellow-900/80', text: 'text-yellow-300', label: '몸에 맞는 볼', desc: '출루!' };
   }
 }
 
