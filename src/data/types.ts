@@ -72,6 +72,7 @@ export type PitchOutcome =
   | 'swinging_strike'
   | 'foul'
   | 'ball'
+  | 'hit_by_pitch'
   | 'single'
   | 'double'
   | 'triple'
@@ -101,7 +102,7 @@ export interface PitchTrajectory {
 }
 
 // Game mode
-export type GameMode = 'japan' | 'dom' | 'usa' | 'can' | 'kbo' | 'batting' | 'scenario';
+export type GameMode = 'japan' | 'dom' | 'usa' | 'can' | 'kbo' | 'batting' | 'kim_batting' | 'scenario';
 
 // DOM-specific game phase adds mode_select, pitcher_select, lineup_select
 export type GamePhase =

@@ -67,7 +67,14 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
     // Ball zone
     if (pZ > 3.5) return ZONE_SCREEN_POS[11]; // high
     if (pZ < 1.5) return ZONE_SCREEN_POS[12]; // low
-    if (pX < -0.85) return ZONE_SCREEN_POS[13]; // inside
+    if (pX < -0.85) {
+      if (pX < -1.3) {
+        // At batter — extreme inside (HBP territory)
+        const factor = Math.min((-pX - 1.3) / 1.0, 1);
+        return { x: 34 - factor * 12, y: 42 + factor * 3 };
+      }
+      return ZONE_SCREEN_POS[13]; // inside
+    }
     return ZONE_SCREEN_POS[14]; // outside
   }, [pitch.pX, pitch.pZ]);
 
@@ -114,6 +121,7 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
   const isWhiff = effect?.outcome === 'swinging_strike';
   const isFoul = effect?.outcome === 'foul';
   const isOut = effect && ['groundout', 'flyout', 'lineout'].includes(effect.outcome);
+  const isHBP = effect?.outcome === 'hit_by_pitch';
 
   const target = getTargetPos();
 
@@ -195,6 +203,19 @@ export default function BatterViewScene({ pitch, isAnimating, onAnimationComplet
               <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full animate-ping opacity-50"
                 style={{ background: 'radial-gradient(circle, rgba(200,200,200,0.5), transparent)' }} />
             </div>
+          )}
+          {isHBP && (
+            <>
+              <div className="absolute inset-0 animate-pulse bg-red-500/20 z-30" />
+              <div className="absolute pointer-events-none z-30 animate-ping"
+                style={{ left: `${target.x}%`, top: `${target.y}%`, transform: 'translate(-50%, -50%)' }}>
+                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full"
+                  style={{ background: 'radial-gradient(circle, #ef4444, #dc2626, transparent)' }} />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center z-40 pointer-events-none">
+                <span className="text-6xl sm:text-8xl animate-bounce">😵</span>
+              </div>
+            </>
           )}
         </>
       )}

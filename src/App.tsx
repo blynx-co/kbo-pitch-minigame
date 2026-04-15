@@ -52,6 +52,7 @@ import { KBO_LINEUPS } from './data/kboLineups';
 import InningTransition from './components/InningTransition';
 import { gameAudio } from './audio/gameAudio';
 import BattingApp from './BattingApp';
+import KimBattingApp from './KimBattingApp';
 import { useLanguage } from './i18n/LanguageContext';
 
 const TOTAL_AT_BATS_JAPAN = SCENARIOS.length;
@@ -270,8 +271,8 @@ export default function App() {
   // Handlers
   const handleSelectMode = useCallback((mode: GameMode) => {
     setGameMode(mode);
-    if (mode === 'batting') {
-      setPhase('intro'); // BattingApp manages its own phases
+    if (mode === 'batting' || mode === 'kim_batting') {
+      setPhase('intro'); // BattingApp/KimBattingApp manages its own phases
     } else if (mode === 'scenario') {
       setPhase('scenario_select');
     } else {
@@ -683,9 +684,12 @@ export default function App() {
 
   // Render based on phase
   const content = (() => {
-    // Batting mode has its own self-contained app
+    // Batting modes have their own self-contained apps
     if (gameMode === 'batting' && phase !== 'mode_select') {
       return <BattingApp onBack={handleRestart} />;
+    }
+    if (gameMode === 'kim_batting' && phase !== 'mode_select') {
+      return <KimBattingApp onBack={handleRestart} />;
     }
 
     switch (phase) {
