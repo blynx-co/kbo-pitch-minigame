@@ -20,7 +20,7 @@ type BattingPhase =
   | 'game_result';
 
 interface PARecord {
-  result: 'strikeout' | 'walk' | 'hit' | 'homerun' | 'out' | 'hbp';
+  result: 'strikeout' | 'walk' | 'hit' | 'homerun' | 'out' | 'hbp' | 'injury';
   pitchCount: number;
 }
 
@@ -123,11 +123,10 @@ export default function KimBattingApp({ onBack }: { onBack: () => void }) {
     setCurrentPitch(pitch);
     setBallLaunched(false);
 
-    const pitchInfo = KIM_SEOHYUN_PROFILE.pitches.find(p => p.code === pitch.pitchCode);
     const traj = generateKimPitchTrajectory(
       pitch.pitchCode,
       pitch.zone,
-      pitchInfo?.avgSpeed ?? 90,
+      pitch.speedKmh / 1.609, // km/h → mph for physics
       pitch.isAtBatter,
     );
     setTrajectory(traj);
@@ -209,7 +208,9 @@ export default function KimBattingApp({ onBack }: { onBack: () => void }) {
       newBalls = balls + 1;
       if (newBalls >= 4) { abOver = true; abResult = 'walk'; }
     } else if (outcome === 'hit_by_pitch') {
-      abOver = true; abResult = 'hbp';
+      abOver = true;
+      // 30% chance of injury → game over
+      abResult = Math.random() < 0.30 ? 'injury' : 'hbp';
     } else if (outcome === 'homerun') {
       abOver = true; abResult = 'homerun';
     } else if (['single', 'double', 'triple'].includes(outcome)) {
@@ -225,7 +226,12 @@ export default function KimBattingApp({ onBack }: { onBack: () => void }) {
 
       const isOnBase = ['walk', 'hit', 'homerun', 'hbp'].includes(abResult);
 
-      if (isOnBase) {
+      if (abResult === 'injury') {
+        // HBP + injury: streak counts (got on base) but game ends
+        setStreak(prev => prev + 1);
+        gameAudio.stopAmbient();
+        setPhase('game_result');
+      } else if (isOnBase) {
         setStreak(prev => prev + 1);
         if (abResult === 'homerun') {
           gameAudio.onPitchOutcome('homerun');
@@ -312,9 +318,10 @@ export default function KimBattingApp({ onBack }: { onBack: () => void }) {
           <p className="text-slate-300 mb-2">• 아웃 없이 <span className="text-orange-400 font-bold">연속 출루</span>하세요!</p>
           <p className="text-slate-300 mb-2">• 안타, 볼넷, 몸에 맞는 볼 = <span className="text-green-400">출루!</span></p>
           <p className="text-slate-300 mb-2">• 아웃되면 <span className="text-red-400 font-bold">게임 종료</span></p>
+          <p className="text-slate-300 mb-2">• 몸에 맞으면 <span className="text-red-400 font-bold">30% 확률로 부상 → 게임 종료</span></p>
           <p className="text-slate-300 mb-2">• 와인드업 중 <span className="text-orange-400 font-bold">스윙할 존을 선택</span></p>
           <p className="text-slate-300 mb-1">• 공이 몸쪽으로 오면 <span className="text-orange-400 font-bold">Z키로 피하기!</span></p>
-          <p className="text-slate-500 text-xs mt-2">⚠️ 김서현의 직구는 몸쪽으로 크게 휩니다</p>
+          <p className="text-slate-500 text-xs mt-2">⚠️ 김서현의 직구(145~158km/h)는 몸쪽으로 크게 휩니다</p>
         </div>
         <button
           onClick={handleStart}
@@ -446,7 +453,7 @@ export default function KimBattingApp({ onBack }: { onBack: () => void }) {
 
         <div className="text-slate-500 text-xs mb-6">
           김서현: {KIM_SEOHYUN_PROFILE.pitches.find(p => p.code === currentPitch?.pitchCode)?.nameKo ?? '?'}
-          {' '}{Math.round((KIM_SEOHYUN_PROFILE.pitches.find(p => p.code === currentPitch?.pitchCode)?.avgSpeed ?? 90) * 1.609)}km/h
+          {' '}{currentPitch?.speedKmh ?? '?'}km/h
         </div>
 
         {showNextBtn ? (
@@ -515,13 +522,16 @@ export default function KimBattingApp({ onBack }: { onBack: () => void }) {
     const hitCount = records.filter(r => r.result === 'hit').length;
     const hrCount = records.filter(r => r.result === 'homerun').length;
     const walkCount = records.filter(r => r.result === 'walk').length;
-    const hbpCount = records.filter(r => r.result === 'hbp').length;
+    const hbpCount = records.filter(r => r.result === 'hbp' || r.result === 'injury').length;
+    const isInjury = records[records.length - 1]?.result === 'injury';
 
     return (
       <div className="min-h-[calc(100vh-22vh)] bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center justify-center px-4 py-8 text-center pb-[20vh]">
         <h2 className="text-slate-400 text-lg mb-1">김서현과 승부하기</h2>
+        {isInjury && <div className="text-4xl mb-2">🏥</div>}
         <div className="text-7xl font-black text-orange-400 mb-1">{streak}</div>
         <div className="text-slate-300 font-medium text-lg mb-1">연속 출루</div>
+        {isInjury && <div className="text-red-400 text-sm font-bold mb-2">부상으로 게임 종료!</div>}
         <div className={`text-sm mb-6 font-bold ${gradeColor}`}>{gradeMsg}</div>
 
         <div className="bg-slate-800/80 rounded-xl border border-orange-700/50 p-4 mb-6 w-full max-w-xs">
@@ -548,8 +558,8 @@ export default function KimBattingApp({ onBack }: { onBack: () => void }) {
         {/* PA history */}
         <div className="w-full max-w-xs mb-6">
           {records.map((r, i) => {
-            const emoji = r.result === 'homerun' ? '💥' : r.result === 'hit' ? '🟢' : r.result === 'walk' ? '🟡' : r.result === 'hbp' ? '🔵' : r.result === 'strikeout' ? '❌' : '🔴';
-            const label = r.result === 'homerun' ? '홈런' : r.result === 'hit' ? '안타' : r.result === 'walk' ? '볼넷' : r.result === 'hbp' ? '사구' : r.result === 'strikeout' ? '삼진' : '아웃';
+            const emoji = r.result === 'homerun' ? '💥' : r.result === 'hit' ? '🟢' : r.result === 'walk' ? '🟡' : r.result === 'hbp' ? '🔵' : r.result === 'injury' ? '🏥' : r.result === 'strikeout' ? '❌' : '🔴';
+            const label = r.result === 'homerun' ? '홈런' : r.result === 'hit' ? '안타' : r.result === 'walk' ? '볼넷' : r.result === 'hbp' ? '사구' : r.result === 'injury' ? '부상(사구)' : r.result === 'strikeout' ? '삼진' : '아웃';
             return (
               <div key={i} className="flex items-center justify-between text-sm py-1 border-b border-slate-800">
                 <span className="text-slate-500">{i + 1}타석</span>

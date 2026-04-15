@@ -37,6 +37,7 @@ export interface KimPitch {
   pitchCode: string;
   zone: Zone;
   isAtBatter: boolean;
+  speedKmh: number;
 }
 
 export function kimSelectPitch(balls: number, strikes: number): KimPitch {
@@ -44,32 +45,44 @@ export function kimSelectPitch(balls: number, strikes: number): KimPitch {
   const pitchWeights = KIM_PITCH_WEIGHTS[countKey] ?? KIM_PITCH_WEIGHTS['1-1'];
   const pitchCode = weightedRandom(pitchWeights);
 
-  // 40% strike zone, 60% ball
-  const isStrike = Math.random() < 0.40;
+  // Random speed per pitch (km/h)
+  const speedKmh = Math.round(
+    pitchCode === 'FF' ? 145 + Math.random() * 13  // 145~158
+    : pitchCode === 'SL' ? 125 + Math.random() * 8 // 125~133
+    : 128 + Math.random() * 8                       // 128~136 (CH)
+  );
+
+  // 30% strike zone, 70% ball — very bad control
+  const isStrike = Math.random() < 0.30;
 
   if (isStrike) {
     const zone = STRIKE_ZONES[Math.floor(Math.random() * STRIKE_ZONES.length)];
-    return { pitchCode, zone, isAtBatter: false };
+    return { pitchCode, zone, isAtBatter: false, speedKmh };
   }
 
-  // Ball zone distribution (matches pitch map: lots of high, inside, low scatter)
+  // Ball zone distribution — ~15-20% of ALL pitches go at the batter
+  // Among balls: at-batter 28%, high 25%, inside(non-HBP) 10%, low 22%, outside 15%
   const ballRoll = Math.random();
-  if (ballRoll < 0.25) {
-    // High ball — very common for Kim
-    return { pitchCode, zone: 11 as Zone, isAtBatter: false };
-  }
-  if (ballRoll < 0.55) {
-    // Inside — FF has high chance of going at batter's body
-    const atBatterChance = pitchCode === 'FF' ? 0.35 : 0.05;
+  if (ballRoll < 0.28) {
+    // At batter! — FF almost always, SL/CH occasionally
+    const atBatterChance = pitchCode === 'FF' ? 0.85 : 0.30;
     const isAtBatter = Math.random() < atBatterChance;
-    return { pitchCode, zone: 13 as Zone, isAtBatter };
+    return { pitchCode, zone: 13 as Zone, isAtBatter, speedKmh };
   }
-  if (ballRoll < 0.78) {
+  if (ballRoll < 0.53) {
+    // High ball
+    return { pitchCode, zone: 11 as Zone, isAtBatter: false, speedKmh };
+  }
+  if (ballRoll < 0.63) {
+    // Inside (not at batter)
+    return { pitchCode, zone: 13 as Zone, isAtBatter: false, speedKmh };
+  }
+  if (ballRoll < 0.85) {
     // Low ball
-    return { pitchCode, zone: 12 as Zone, isAtBatter: false };
+    return { pitchCode, zone: 12 as Zone, isAtBatter: false, speedKmh };
   }
   // Outside
-  return { pitchCode, zone: 14 as Zone, isAtBatter: false };
+  return { pitchCode, zone: 14 as Zone, isAtBatter: false, speedKmh };
 }
 
 /**
